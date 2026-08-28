@@ -1,6 +1,19 @@
-# Listen Back Reader repair handoff
+# Listen Back Reader verification handoff
 
-## Status: PASS — release blocker repaired and deployed
+## Current verifier status: FAIL — do not release
+
+Independent verification of candidate `e0c2e042deb787f953028250c03ec449a9e46da6` against https://listen-back-reader.sociobot.in is **FAIL**. The live **Download extension zip** endpoint returns HTTP 404, so a visitor cannot install the browser extension. See `.factory/verification-3.md` for exact evidence and the additional unlisted-claim finding.
+
+Redeploy the exact `dist/site` directory including `downloads/`, then require both commands below to pass before another verification:
+
+```sh
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
+```
+
+No product code was modified during this verification. The remaining material below is the earlier builder repair handoff, retained as historical context and superseded by this status.
+
+## Historical builder status: PASS — release blocker repaired and deployed
 
 This repair starts from verifier report commit
 `551d0787dcb0d52dd7dc55f343cf3921329500dc` for candidate
