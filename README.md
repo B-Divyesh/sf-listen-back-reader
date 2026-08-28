@@ -13,6 +13,9 @@ already available in your browser. Page text does not leave your device.
 - Marks the source sentence on the page as it is read.
 - Supports Alt + R to replay, Alt + Left to go back, and Alt + Right to move on.
 
+The extension reads the active page only after you open its toolbar popup or
+press Alt + R. It does not request access to every site in advance.
+
 It does not rewrite text, make a diagnosis, create a voice, or store an account.
 
 ## Try the sample

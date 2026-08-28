@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('static deployment response policy', () => {
   it('maps every declared public claim to exactly one regression test', () => {
@@ -63,10 +63,50 @@ describe('static deployment response policy', () => {
     expect(readFileSync('dist/site/downloads/listen-back-reader.zip').byteLength).toBeGreaterThan(1_000);
   }, 30_000);
 
+  it('@claim:active-page-only packages explicit active-tab injection with no standing site access', async () => {
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe' });
+    const manifest = JSON.parse(readFileSync('.output/chrome-mv3/manifest.json', 'utf8'));
+    expect(manifest.permissions).toEqual(['activeTab', 'scripting']);
+    expect(manifest).not.toHaveProperty('content_scripts');
+    expect(manifest).not.toHaveProperty('host_permissions');
+
+    const content = readFileSync('entrypoints/content.ts', 'utf8');
+    const background = readFileSync('entrypoints/background.ts', 'utf8');
+    expect(content).toContain("registration: 'runtime'");
+    expect(background).toContain('browser.scripting.executeScript');
+
+    let activate: ((message: unknown) => unknown) | undefined;
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error('No reader in this tab yet.'))
+      .mockResolvedValueOnce({ count: 2, current: 0, text: 'First.', rate: 1 });
+    const executeScript = vi.fn().mockResolvedValue([]);
+    vi.stubGlobal('browser', {
+      runtime: { onMessage: { addListener: vi.fn((listener) => { activate = listener; }) } },
+      commands: { onCommand: { addListener: vi.fn() } },
+      tabs: { query: vi.fn(), sendMessage },
+      scripting: { executeScript },
+    });
+    vi.stubGlobal('defineBackground', (main: () => void) => main);
+    vi.resetModules();
+    const entrypoint = await import('../entrypoints/background');
+    (entrypoint.default as unknown as () => void)();
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(executeScript).not.toHaveBeenCalled();
+    await expect(activate?.({ type: 'listen-back-activate', tabId: 7 })).resolves.toEqual({ count: 2, current: 0, text: 'First.', rate: 1 });
+    expect(executeScript).toHaveBeenCalledWith({ target: { tabId: 7 }, files: ['/content-scripts/content.js'] });
+    expect(sendMessage).toHaveBeenNthCalledWith(1, 7, { type: 'listen-back-get-state' });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, 7, { type: 'listen-back-get-state' });
+    vi.unstubAllGlobals();
+  }, 30_000);
+
   it('@claim:installable-package builds the linked download as a valid MV3 extension archive', () => {
     execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe' });
     const manifest = JSON.parse(execFileSync('unzip', ['-p', 'dist/site/downloads/listen-back-reader.zip', 'manifest.json'], { encoding: 'utf8' }));
     expect(manifest).toMatchObject({ manifest_version: 3, name: 'Listen Back Reader' });
+    expect(manifest.permissions).toEqual(['activeTab', 'scripting']);
+    expect(manifest).not.toHaveProperty('content_scripts');
+    expect(manifest).not.toHaveProperty('host_permissions');
     const builtSite = execFileSync('sh', ['-c', 'cat dist/site/assets/*.js'], { encoding: 'utf8' });
     expect(builtSite).toContain('/downloads/listen-back-reader.zip');
   }, 30_000);
@@ -86,6 +126,7 @@ describe('static deployment response policy', () => {
     ]));
     const manifest = readFileSync('wxt.config.ts', 'utf8');
     expect(manifest).not.toMatch(/identity|cookies|webRequest|externally_connectable/);
+    expect(manifest).not.toMatch(/storage|<all_urls>/);
   });
 
   it('@claim:session-memory keeps position and speed in memory without a reading history', () => {

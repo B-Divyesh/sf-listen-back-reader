@@ -14,7 +14,7 @@ function App() {
     try {
       const active = await tab();
       if (!active?.id) throw new Error('No active page.');
-      const response = await browser.tabs.sendMessage(active.id, { type: 'listen-back-get-state' });
+      const response = await browser.runtime.sendMessage({ type: 'listen-back-activate', tabId: active.id });
       if (response?.count === 0) setError(response?.error || 'No readable text was found here. Open an article, then try again.');
       else { setState(response); setError(''); }
     } catch { setError('This page cannot be read by the extension. Try an ordinary web article.'); }

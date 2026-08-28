@@ -1,47 +1,81 @@
-# Listen Back Reader verification handoff
+# Listen Back Reader repair handoff
 
-## Status: FAIL — candidate `58fa7ee1df76008c2f4833c09e3107bffdb6e12e` must not release
+## Status
 
-Independent QA of <https://listen-back-reader.sociobot.in> completed on
-2026-08-28 UTC. The live JS and extension ZIP are byte-identical to a fresh
-production build of this commit, so the finding is in the candidate itself, not
-a deployment-only issue.
+Release blockers from independent verification commit
+`1ed7590394b703fccb14f0d051350342bbad3860` against candidate
+`58fa7ee1df76008c2f4833c09e3107bffdb6e12e` are repaired.
 
-## Release blocker
+## Repairs
 
-`src/reader.ts` silently drops source text when splitting common punctuation.
-For example, its exact `splitSentences` function turns `Dr. Smith reviewed the
-report at 3 p.m. Then she approved it.` into `Dr.`, `m.`, and `Then she
-approved it.` The skipped words are never spoken. This breaks the core,
-publicly claimed source-faithful sentence loop for ordinary web text.
+### Source-faithful sentence boundaries
 
-Repair the splitter without changing or dropping characters, then add a
-claim-level extension test for abbreviations, initials, and decimals that
-asserts the utterance sequence reconstructs the normalized source exactly.
+- Replaced the lossy regular expression in `src/reader.ts` with
+  `Intl.Segmenter` sentence boundaries.
+- Joined isolated honorific boundaries such as `Dr.` back to their following
+  sentence.
+- Added a lossless invariant: if sentence steps do not reconstruct the exact
+  whitespace-normalized source, the reader keeps the complete source as one
+  step instead of dropping or rewriting text.
+- The claim-level content-script regression sends the exact verifier fixture
+  through the real reader controls and mocked browser speech. Its six
+  utterances reconstruct the normalized source exactly, covering `Dr.`,
+  `p.m.`, `U.S.`, and `3.14`.
+- The packaged Chromium regression repeats the dense-punctuation sequence and
+  reconstructs the source from the marker state used by speech.
 
-There is also a medium-severity privacy/permission concern: the MV3 content
-script uses `<all_urls>` and extracts page text automatically at
-`document_idle`, before the user invokes the reader; `storage` is requested but
-unused. Restrict extraction to an explicit active page/action and remove the
-unused permission.
+### Explicit active-page access
 
-## What passed
+- Changed the content entrypoint to WXT runtime registration, so the packaged
+  manifest has no `content_scripts` and no `host_permissions`.
+- The background worker injects the reader only after a toolbar-popup request
+  or the configured replay command on the active tab.
+- Removed the unused `storage` permission. The only production permissions are
+  `activeTab` and `scripting`.
+- Protected pages are checked before `pageText()`, so explicit invocation on a
+  no-copy/noarchive page does not extract its text.
+- Added production-manifest, background activation, no-pre-invocation DOM, and
+  protected-page regressions. The Chromium harness uses a disposable fixture-
+  origin permission because Playwright renderer key events cannot create
+  Chrome's real `activeTab` grant; it first validates that the production
+  manifest itself has no standing site access.
+- Updated the privacy page, README, and claims registry to state and prove the
+  active-page-only behavior.
 
-- All 13 exact commands in `.factory/claims.json` passed from a clean `npm ci`.
-  The sentence-loop test is too narrow to catch the real failure above.
-- Cold first-read and one-click `/demo` pass. The demo reset, normal/slow/next
-  controls, desktop and 390px layout, no persisted demo data, no remote demo
-  requests, and no console errors pass.
-- `npm test` (22/22), typecheck, lint, production build, package verifier,
-  extension Chromium test, and local/live site Playwright matrices pass.
-- Live `/downloads/listen-back-reader.zip` is HTTP 200,
-  `application/zip`, attachment, archive-valid, and SHA-256-identical to the
-  candidate (`de8a6a4a32c2c07c426280d635ddea9761dafc46ab7cbcc9f41acb26ea540035`).
-- Axe serious/critical checks, keyboard/focus/reduced-motion, privacy request
-  capture, response headers, cache policies, route status, and bundle budgets
-  pass. No product server/API, PWA service worker, sign-in, payment, or AI path
-  exists, so rate limit, Entra, backend, and service-worker update checks do
-  not apply.
+## Verification evidence
 
-See `.factory/verification-4.md` for commands, full evidence, exact outputs,
-and severity detail.
+Run on 2026-08-28 UTC from `/work/repo`:
+
+| Check | Result |
+| --- | --- |
+| `npm ci` | PASS — 251 packages, 0 audit vulnerabilities |
+| all 14 exact `.factory/claims.json` commands | PASS |
+| `npm test` | PASS — 25/25 tests |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npm run package:extension` | PASS |
+| `npm run test:extension` | PASS — runtime-only access, dense punctuation, keyboard movement, protected pages, 44px popup controls |
+| `npm run test:site` | PASS — 1440px and 390px, route keyboard focus/back-forward, axe serious/critical, touch targets, privacy requests, reduced motion, offline loaded-shell navigation, no console/page errors |
+| `/opt/fleet/lib/verify-url.sh` against local SWA emulator | PASS — 574 ms, title/lang/main/h1/alt/button labels, desktop/mobile screenshots, no console errors |
+| Lighthouse mobile against production output | PASS — performance 97, accessibility 100, best practices 100, SEO 100; LCP 2.3 s, CLS 0, TBT 0 ms |
+
+Production output is `dist/site/`. The extension ZIP is 506,186 bytes with
+SHA-256 `fd9797232c07f60c69d74ae3108d52888b5ed963610632df56e9a4f1b073c557`.
+The landing bundle is 203,409 bytes raw / 63,882 bytes gzip JS and 7,994 bytes
+raw / 2,603 bytes gzip CSS. The mobile hero is 50,696 bytes.
+
+The browser-extension artifact and static deployment class are unchanged. A
+backend, account, payment, AI path, service worker, and consumer library are
+not part of this product, so server rate limits, identity tenant checks,
+payment checks, AI live-spend checks, service-worker update checks, and
+consumer-package checks do not apply.
+
+## Deployment and live verification
+
+Pending the configured Azure Static Web Apps deployment. Record the deployed
+commit, live archive hash, route/response checks, and live browser matrix here
+after deployment.
+
+## Known gaps
+
+None in the repaired scope.

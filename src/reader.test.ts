@@ -4,12 +4,27 @@ import { isCopyRestricted } from './page-policy';
 import { readerShortcutCommand, runReaderShortcut } from './reader-shortcuts';
 
 describe('sentence reading loop', () => {
-  it('@claim:sentence-loop keeps source punctuation and makes one sentence per step', () => {
+  it('keeps source punctuation and makes one sentence per step', () => {
     expect(splitSentences('First source sentence. Second source sentence! Last one?')).toEqual([
       { id: 0, text: 'First source sentence.' },
       { id: 1, text: 'Second source sentence!' },
       { id: 2, text: 'Last one?' },
     ]);
+  });
+
+  it('never drops text around abbreviations, initialisms, or decimals', () => {
+    const source = 'Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.';
+    const sentences = splitSentences(source);
+
+    expect(sentences.map(({ text }) => text)).toEqual([
+      'Dr. Smith reviewed the report at 3 p.m.',
+      'Then she approved it.',
+      'The U.S. team met.',
+      'Next item.',
+      'A decimal is 3.14.',
+      'Done.',
+    ]);
+    expect(sentences.map(({ text }) => text).join(' ')).toBe(source);
   });
 
   it('does not leave the available sentence range', () => {
@@ -68,18 +83,65 @@ describe('protected page policy', () => {
 });
 
 describe('content-script protected-page keyboard regression', () => {
+  it('@claim:sentence-loop supplies every normalized source character to speech across dense punctuation', async () => {
+    document.documentElement.removeAttribute('data-listen-back');
+    document.head.innerHTML = '';
+    document.body.innerHTML = '<main><p>Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.</p></main>';
+
+    let main: (() => void) | undefined;
+    let receive: ((message: unknown) => unknown) | undefined;
+    const speak = vi.fn();
+    vi.stubGlobal('speechSynthesis', { cancel: vi.fn(), speak });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { rate = 1; onend?: () => void; constructor(public text: string) {} });
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal('browser', {
+      runtime: {
+        onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
+        sendMessage: vi.fn(() => Promise.resolve()),
+      },
+    });
+    vi.stubGlobal('defineContentScript', (definition: { main: () => void }) => {
+      main = definition.main;
+      return definition;
+    });
+
+    vi.resetModules();
+    await import('../entrypoints/content');
+    main?.();
+    const state = receive?.({ type: 'listen-back-get-state' }) as { count: number };
+    receive?.({ type: 'listen-back-control', action: 'start' });
+    for (let index = 1; index < state.count; index += 1) {
+      receive?.({ type: 'listen-back-control', action: 'next' });
+    }
+
+    const normalized = pageText();
+    const spoken = speak.mock.calls.map(([utterance]) => (utterance as { text: string }).text);
+    expect(spoken).toHaveLength(state.count);
+    expect(spoken.join(' ')).toBe(normalized);
+    expect(spoken).toEqual([
+      'Dr. Smith reviewed the report at 3 p.m.',
+      'Then she approved it.',
+      'The U.S. team met.',
+      'Next item.',
+      'A decimal is 3.14.',
+      'Done.',
+    ]);
+  });
+
   it('does not mark or speak a noarchive page after Alt+R', async () => {
     document.documentElement.removeAttribute('data-listen-back');
     document.head.innerHTML = '<meta name="robots" content="noarchive">';
     document.body.innerHTML = '<main><p>A protected source sentence.</p></main>';
 
     let main: (() => void) | undefined;
+    let receive: ((message: unknown) => unknown) | undefined;
     const speak = vi.fn();
     vi.stubGlobal('speechSynthesis', { cancel: vi.fn(), speak });
     vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
     vi.stubGlobal('browser', {
       runtime: {
-        onMessage: { addListener: vi.fn() },
+        onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
         sendMessage: vi.fn(() => Promise.resolve()),
       },
     });
@@ -92,11 +154,9 @@ describe('content-script protected-page keyboard regression', () => {
     await import('../entrypoints/content');
     expect(main).toBeTypeOf('function');
     main?.();
+    const response = receive?.({ type: 'listen-back-command', command: 'replay_sentence' });
 
-    const shortcut = new KeyboardEvent('keydown', { altKey: true, key: 'r', bubbles: true, cancelable: true });
-    document.dispatchEvent(shortcut);
-
-    expect(shortcut.defaultPrevented).toBe(true);
+    expect(response).toEqual({ error: 'This page asks readers not to copy its text. Listen Back will not read it.' });
     expect(document.querySelector('#listen-back-marker')).toBeNull();
     expect(speak).not.toHaveBeenCalled();
   });
@@ -107,6 +167,7 @@ describe('content-script protected-page keyboard regression', () => {
     document.body.innerHTML = '<main><p>First source sentence.</p> <p>Second source sentence.</p></main>';
 
     let main: (() => void) | undefined;
+    let receive: ((message: unknown) => unknown) | undefined;
     const speak = vi.fn();
     vi.stubGlobal('speechSynthesis', { cancel: vi.fn(), speak });
     vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
@@ -114,7 +175,7 @@ describe('content-script protected-page keyboard regression', () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal('browser', {
       runtime: {
-        onMessage: { addListener: vi.fn() },
+        onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
         sendMessage: vi.fn(() => Promise.resolve()),
       },
     });
@@ -126,10 +187,10 @@ describe('content-script protected-page keyboard regression', () => {
     vi.resetModules();
     await import('../entrypoints/content');
     main?.();
-    document.dispatchEvent(new KeyboardEvent('keydown', { altKey: true, key: 'r', bubbles: true, cancelable: true }));
+    receive?.({ type: 'listen-back-control', action: 'start' });
 
     const marker = document.querySelector<HTMLElement>('#listen-back-marker');
-    expect(marker?.getAttribute('aria-label')).toBe('Current sentence marker');
+    expect(marker?.getAttribute('aria-label')).toBe('Current sentence: First source sentence.');
     expect(marker?.style.borderLeft).toContain('8px');
     expect(speak).toHaveBeenCalledOnce();
     expect((speak.mock.calls[0]?.[0] as { text: string }).text).toBe('First source sentence.');

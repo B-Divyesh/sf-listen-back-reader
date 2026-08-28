@@ -3,13 +3,13 @@ import { copyRestrictedMessage, isCopyRestricted } from '../src/page-policy';
 import { readerShortcutCommand, runReaderShortcut, type ReaderCommand } from '../src/reader-shortcuts';
 
 export default defineContentScript({
-  matches: ['<all_urls>'],
+  registration: 'runtime',
   runAt: 'document_idle',
   main() {
     if (document.documentElement.getAttribute('data-listen-back')) return;
     document.documentElement.setAttribute('data-listen-back', 'ready');
     const copyRestricted = isCopyRestricted(document);
-    const sentences = splitSentences(pageText());
+    const sentences = copyRestricted ? [] : splitSentences(pageText());
     let current = 0;
     let rate = 1;
     let marker: HTMLDivElement | undefined;
@@ -44,6 +44,7 @@ export default defineContentScript({
       activeElement = el;
       const rect = el.getBoundingClientRect();
       const layer = ensureMarker();
+      layer.setAttribute('aria-label', `Current sentence: ${sentence.text}`);
       Object.assign(layer.style, {
         top: `${window.scrollY + rect.top - 4}px`, left: `${window.scrollX + rect.left - 9}px`,
         width: `${rect.width + 18}px`, height: `${rect.height + 8}px`,
@@ -75,7 +76,7 @@ export default defineContentScript({
       if (request.type === 'listen-back-command') {
         if (copyRestricted) return { error: copyRestrictedMessage };
         if (!sentences.length) return { error: 'No readable text found on this page.' };
-        if (request.command) runCommand(request.command);
+        if (request.command) runCommand(request.command, true);
       }
       if (request.type === 'listen-back-control') {
         if (copyRestricted) return { error: copyRestrictedMessage };
