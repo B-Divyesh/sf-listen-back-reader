@@ -1,0 +1,34 @@
+{
+  "name": "listen-back-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:extension": "wxt dev",
+    "build": "npm run build:extension && npm run build:site && npm run archive:extension",
+    "build:extension": "wxt build",
+    "build:site": "vite build && cp staticwebapp.config.json dist/site/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "archive:extension": "mkdir -p dist/site/downloads && cd .output/chrome-mv3 && zip -qr ../../dist/site/downloads/listen-back-reader.zip .",
+    "package:extension": "npm run build"
+  },
+  "dependencies": {
+    "@wxt-dev/module-react": "^1.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "wxt": "^0.20.11"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.2",
+    "axe-core": "^4.11.0",
+    "jsdom": "^26.1.0",
+    "playwright": "^1.58.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3",
+    "vitest": "^3.2.4"
+  }
+}

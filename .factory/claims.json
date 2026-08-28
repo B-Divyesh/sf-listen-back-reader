@@ -1,0 +1,6 @@
+[
+  {"id":"sentence-loop","claim":"Reads one source sentence at a time","where":"Landing preview, extension popup, README","test":"npm test -- -t @claim:sentence-loop","sandbox":"Fresh test environment; use original sample text and assert one source-punctuation-preserving sentence per step."},
+  {"id":"local-speech","claim":"Uses your browser's voice","where":"Landing facts, demo, README","test":"npm test -- -t @claim:local-speech","sandbox":"Fresh browser context at /demo; mock SpeechSynthesisUtterance and assert the sample control creates one utterance with its visible sentence."},
+  {"id":"local-text","claim":"Text stays on your device","where":"Landing facts, privacy page, README","test":"npm test -- -t @claim:local-text","sandbox":"Fresh test environment; extract source text from the DOM and assert no network function is called."},
+  {"id":"demo-not-saved","claim":"Demo sample data is not saved","where":"Demo banner and demo page","test":"npm test -- -t @claim:demo-not-saved","sandbox":"Fresh browser context at /demo; interact with controls, reset the route, and assert no Listen Back localStorage keys or requests leave same origin."}
+]
