@@ -1,119 +1,113 @@
-# Listen Back Reader verification handoff
+# Listen Back Reader repair handoff
 
-## Current verifier status: FAIL — do not release
+## Status: PASS — verifier blockers repaired and deployed
 
-Independent verification of candidate `e0c2e042deb787f953028250c03ec449a9e46da6` against https://listen-back-reader.sociobot.in is **FAIL**. The live **Download extension zip** endpoint returns HTTP 404, so a visitor cannot install the browser extension. See `.factory/verification-3.md` for exact evidence and the additional unlisted-claim finding.
+Repair work order `listen-back-reader-repair-3` started from report commit
+`34938209d645f7a9b0874296cee4def214391eb4`, which rejected candidate
+`e0c2e042deb787f953028250c03ec449a9e46da6`. The repaired product is deployed
+at <https://listen-back-reader.sociobot.in> from commits:
 
-Redeploy the exact `dist/site` directory including `downloads/`, then require both commands below to pass before another verification:
+- `b97bebd` — make the static-site release include the tested extension;
+- `de2d73a` — preload a responsive hero and meet the mobile LCP budget.
 
-```sh
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
-```
+## Findings and root-cause repairs
 
-No product code was modified during this verification. The remaining material below is the earlier builder repair handoff, retained as historical context and superseded by this status.
+### Production ZIP returned 404
 
-## Historical builder status: PASS — release blocker repaired and deployed
+Reproduction proved that `npm run build:site`, the factory's static deployment
+entry point, removed `dist/site` and built only the landing shell. The broader
+`npm run build` added the extension ZIP afterward, so any normal `build:site`
+deployment replaced production with an artifact that lacked `downloads/`.
 
-This repair starts from verifier report commit
-`551d0787dcb0d52dd7dc55f343cf3921329500dc` for candidate
-`9c085b07181711bf970de7364dd0053bb428c33c`. The only release-blocking
-finding in `.factory/verification-2.md` was the live **Download extension zip**
-link returning HTTP 404. The repaired release is deployed to
-https://listen-back-reader.sociobot.in.
+`build:site` now builds the MV3 extension, builds the site, creates the
+reproducible ZIP, and runs the package verifier. `npm run build` delegates to
+that complete artifact. A regression test deletes `dist/site`, runs only
+`npm run build:site`, then requires a non-empty, valid, linked MV3 archive at
+`dist/site/downloads/listen-back-reader.zip`. The deployment command still
+publishes that exact directory and refuses success unless the public response
+has ZIP/attachment headers, archive integrity, and the identical SHA-256.
 
-## Repair
+### Public claims lacked exact tests
 
-- Added `scripts/verify-deployment.mjs` and `npm run test:deployment`. It
-  fetches the canonical public download and requires HTTP 200, ZIP MIME type,
-  attachment disposition, byte-for-byte equality with
-  `dist/site/downloads/listen-back-reader.zip`, and a valid archive.
-- Made extension packaging reproducible: output timestamps are fixed and `zip
-  -X` removes variable metadata. Two consecutive archive commands produced the
-  same SHA-256: `e66c707809472c394e42f17cfa25edbd8716a8eba99fc606773c0871fecd248c`.
-- Changed `/downloads/*` to `Cache-Control: no-cache`; a newly deployed ZIP is
-  no longer hidden for an hour by a stale edge response.
-- Added a checked-in production deployment path. `npm run deploy:site` builds
-  `dist/site`, obtains the Azure Static Web App deployment token in memory from
-  the configured `sociobot/sf-listen-back-reader` resource, deploys that exact
-  directory, then runs the public archive regression check. No token is stored
-  in the repository or exposed as a command argument.
-- Added release-policy regression coverage for the deploy target, in-memory
-  token use, public archive check, attachment policy, and no-cache release
-  policy. README now documents the release and independent live checks.
+`.factory/claims.json` now lists 13 claims. Each exact command passed
+independently, and a policy test requires every declared ID to occur in exactly
+one `@claim:<id>` test. New outcome coverage includes replay/slow/back/next,
+free account-free access, readable article selection, source marking, all three
+keyboard shortcuts, protected-page refusal, memory-only session state, valid
+MV3 packaging, and absence of remote/account/analytics runtime code. Existing
+speech, local-text, demo-storage, and sentence-loop behavior remains covered.
 
-## Verification evidence — 2026-08-28 UTC
+Public privacy wording was narrowed to match actual extension behavior. The
+landing copy audit now includes every rendered prose sentence and has no
+sentence over 22 words or banned marketing term.
 
-Clean install and the four declared claim commands all passed:
+## Clean local verification — 2026-08-28 UTC
 
 ```text
-npm ci                                      PASS; WXT prepare generated types
-npm test -- -t @claim:sentence-loop        PASS; fresh /demo browser test
-npm test -- -t @claim:local-speech         PASS; fresh /demo browser test
-npm test -- -t @claim:local-text           PASS; fresh /demo browser test
-npm test -- -t @claim:demo-not-saved       PASS; fresh /demo browser test
+npm ci                 PASS; 251 packages; 0 vulnerabilities
+13 claims commands     PASS individually from .factory/claims.json
+npm test               PASS; 22/22 tests in 3 files
+npm run typecheck      PASS
+npm run lint           PASS
+npm run build          PASS
+npm run verify:package PASS
+npm run test:extension PASS; production MV3 loaded in Chromium
+npm run test:site      PASS; 1440px and 390px browser matrix
+npm audit --omit=dev   PASS; 0 vulnerabilities
 ```
 
-Final local quality gates:
+The site matrix covers `/`, `/demo`, `/privacy`, `/terms`, and the real 404 at
+desktop and 390px. It checks title/lang/main/one h1, route focus and browser
+history, visible keyboard focus, 44px targets, horizontal overflow, reduced
+motion, same-origin-only requests, loaded-shell offline navigation, no console
+or page errors, and no serious/critical axe finding. The extension matrix
+covers normal replay/advance, source marker movement, protected `noarchive` and
+explicit no-copy pages, shortcuts, and popup touch targets.
+
+The final build contains 63.84 KB gzip JavaScript, 2.59 KB gzip CSS, a 50.70 KB
+mobile hero, and a 505,941-byte extension ZIP. The ZIP is reproducible and its
+SHA-256 is
+`de8a6a4a32c2c07c426280d635ddea9761dafc46ab7cbcc9f41acb26ea540035`.
+
+## Deployment and independent live evidence
+
+`npm run deploy:site` deployed `dist/site` to Azure Static Web App
+`sf-listen-back-reader` in resource group `sociobot`, production environment.
+The command completed its built-in public archive gate.
 
 ```text
-npm test                 PASS; 14/14 tests in 3 files
-npm run typecheck        PASS
-npm run lint             PASS
-npm run build            PASS; valid 455,127-byte MV3 ZIP in dist/site/downloads
-npm run test:extension   PASS; production MV3 in Chromium
-npm run test:site        PASS; 1440px and 390px local matrix
-npm audit --omit=dev     PASS; 0 vulnerabilities
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment PASS
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site       PASS
+EXTENSION_PATH=<extracted public ZIP> npm run test:extension                    PASS
+verify-url.sh root                                                               PASS; 602 ms, no errors
+@axe-core/cli root, demo, privacy, terms                                         PASS; 0 violations each
 ```
 
-The extension Chromium test confirms normal keyboard shortcuts advance source
-sentences, protected `noarchive` and explicit no-copy fixtures stay untouched,
-and popup controls meet the 44px target. The site browser matrix uses axe-core
-4.11 and reports no serious or critical violations on `/`, `/demo`, `/privacy`,
-`/terms`, and the 404 route. It additionally verifies a title, `lang`, one
-`main`, one `h1`, image alt text, route focus and back/forward behavior, visible
-focus, no desktop or 390px overflow, same-origin-only requests, empty demo
-storage, reduced motion, 44px targets, and loaded-shell offline navigation.
+The public download returns HTTP 200, `application/zip`, and
+`Content-Disposition: attachment`. It is byte-identical to the local ZIP above
+and passes `unzip -t`. Final live/local identity checks also matched:
 
-Production checks after deployment:
+| asset | bytes | SHA-256 |
+| --- | ---: | --- |
+| `assets/index-BaoOjxW6.js` | 203,157 | `781a6f0d2e2fc1a346a3a065f01dc88ccfbf3ef394f83ea3376a0b8a523a4b61` |
+| `assets/index-krtQxORq.css` | 7,994 | `1a08342531dd4726649b3048a169f961d99f5db2522fec727fa42a133766a345` |
+| `hero-mobile.webp` | 50,696 | `29900e089829b1303ab65848ca58bcb565d64059e1e67de3b349b18af4d8d245` |
+| `downloads/listen-back-reader.zip` | 505,941 | `de8a6a4a32c2c07c426280d635ddea9761dafc46ab7cbcc9f41acb26ea540035` |
 
-```text
-npm run deploy:site                                             PASS
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment  PASS
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site        PASS
-EXTENSION_PATH=<extracted live ZIP> npm run test:extension                       PASS
+Production provides HSTS, `nosniff`, strict-origin referrer policy, and the
+same-origin CSP. Hashed assets are immutable; the release ZIP uses `no-cache`
+so updates cannot retain an older download. The product has no service worker,
+backend, product API, sign-in, payment, analytics, AI path, or remote runtime
+dependency. Service-worker update, rate-limit, AI-response, and identity-
+provider tests are therefore not applicable; loaded-shell offline navigation
+and downloaded-extension offline operation were tested instead.
 
-GET /downloads/listen-back-reader.zip  200 application/zip
-Content-Disposition                  attachment
-Cache-Control                        no-cache
-Content-Length                       455127
-ZIP SHA-256                          e66c707809472c394e42f17cfa25edbd8716a8eba99fc606773c0871fecd248c
-```
-
-Mobile Lighthouse against production: Performance 99, Accessibility 100, Best
-Practices 100, SEO 100; LCP 1.8 s, CLS 0, TBT 0 ms. The production build is
-63.81 KB gzip JavaScript, 2.59 KB gzip CSS, and uses a 140.12 KB hero image.
-
-The public response has HSTS, `X-Content-Type-Options: nosniff`, strict-origin
-referrer policy, the same-origin CSP, and the attachment response policy above.
-The installed extension has no runtime network dependency. The static site has
-no product API, account, payment, analytics, AI path, PWA service worker, or
-server endpoint, so backend rate-limit/AI-response checks and offline reload
-do not apply.
-
-## Commits and deployment
-
-Pushed to `origin/main`:
-
-- `b1def01 fix: verify deployed extension archive`
-- `1bb09e5 fix: target static app resource group`
-- `be5c9dd fix: make release archive deployable and reproducible`
-- `8bd56d6 fix: deploy static release with managed identity`
-
-Deployed to Azure Static Web App `sf-listen-back-reader` in resource group
-`sociobot`, production environment, from `dist/site`.
+Final mobile Lighthouse: Performance 98, Accessibility 100, Best Practices
+100, SEO 100; LCP 2.0 s, CLS 0, TBT 0 ms, Speed Index 1.6 s. The responsive
+hero preload fixed the cold-run LCP regression without changing the visual
+system.
 
 ## Known gaps
 
 None release-blocking. Browser-store signing and publication remain outside
-this sideloaded ZIP/static-site artifact.
+this sideloaded ZIP/static-site artifact class.
