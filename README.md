@@ -43,9 +43,10 @@ npm run test:extension  # loads the production extension in Chromium
 npm run test:site       # desktop, 390px, keyboard, axe, privacy, offline shell
 ```
 
-`npm run build:site` creates the deployable static site in `dist/site`.
-`npm run package:extension` puts the extension archive at
-`dist/site/downloads/listen-back-reader.zip`.
+`npm run build:site` creates the complete deployable static site in `dist/site`,
+including the tested extension archive at
+`dist/site/downloads/listen-back-reader.zip`. `npm run package:extension`
+produces the same complete artifact.
 
 Deploy the exact `dist/site` directory (including `downloads/`) to the
 configured Azure Static Web App. The release command builds the archive,

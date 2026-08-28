@@ -46,7 +46,7 @@ async function openDemo(): Promise<DemoPage> {
 }
 
 describe('browser demo sandbox', () => {
-  it('@claim:sentence-loop reads exactly one source sentence per step', async () => {
+  it('reads exactly one source sentence per step in the sample', async () => {
     const { context, page } = await openDemo();
     try {
       await expect(page.locator('.sample-text p').allTextContents()).resolves.toEqual([
@@ -80,6 +80,19 @@ describe('browser demo sandbox', () => {
       await page.getByRole('button', { name: 'Read sentence' }).click();
       await page.getByRole('button', { name: 'Next sentence' }).click();
       expect(requests.length).toBeGreaterThan(0);
+      expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);
+    } finally { await context.close(); }
+  });
+
+  it('@claim:free-account-free opens the complete sample without sign-in or payment', async () => {
+    const { context, page, requests } = await openDemo();
+    try {
+      expect(await page.getByRole('heading', { level: 1, name: 'Hear one sentence at a time.' }).isVisible()).toBe(true);
+      expect(await page.getByRole('button', { name: 'Read sentence' }).isEnabled()).toBe(true);
+      expect(await page.locator('form, [href*="login"], [href*="sign-in"], [href*="checkout"], [href*="billing"]').count()).toBe(0);
+      await page.getByRole('button', { name: 'Start for real' }).click();
+      expect(await page.getByText('Free and account-free.').isVisible()).toBe(true);
+      expect(await page.getByRole('link', { name: 'Download extension zip' }).getAttribute('href')).toBe('/downloads/listen-back-reader.zip');
       expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);
     } finally { await context.close(); }
   });
