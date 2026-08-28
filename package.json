@@ -20,7 +20,7 @@
     "verify:package": "node scripts/verify-package.mjs",
     "archive:extension": "mkdir -p dist/site/downloads && cd .output/chrome-mv3 && zip -qr ../../dist/site/downloads/listen-back-reader.zip .",
     "package:extension": "npm run build",
-    "deploy:site": "npm run build && swa deploy dist/site --swa-config-location dist/site --app-name sf-listen-back-reader --env production --no-use-keychain && VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment"
+    "deploy:site": "npm run build && swa deploy dist/site --swa-config-location dist/site --app-name sf-listen-back-reader --resource-group sociobot --env production --no-use-keychain && VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment"
   },
   "dependencies": {
     "@wxt-dev/module-react": "^1.2.2",
