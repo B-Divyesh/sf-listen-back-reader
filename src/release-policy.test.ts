@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('static deployment response policy', () => {
@@ -32,6 +32,15 @@ describe('static deployment response policy', () => {
     expect(notFound).toContain('<html lang="en">');
     expect(notFound).toContain('<main id="main">');
     expect(notFound.match(/<h1[ >]/g)).toHaveLength(1);
+  });
+
+  it('preloads a responsive mobile hero within the image budget', () => {
+    const html = readFileSync('index.html', 'utf8');
+    const site = readFileSync('src/site.tsx', 'utf8');
+    expect(html).toContain('rel="preload" as="image"');
+    expect(html).toContain('imagesrcset="/hero-mobile.webp 768w, /hero.webp 1536w"');
+    expect(site).toContain('srcSet="/hero-mobile.webp 768w, /hero.webp 1536w"');
+    expect(statSync('public/hero-mobile.webp').size).toBeLessThan(60_000);
   });
 
   it('makes a release verify the public ZIP that the landing page links to', () => {

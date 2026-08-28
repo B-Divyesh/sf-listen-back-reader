@@ -48,5 +48,6 @@ loop, and a high-visibility sentence ruler in a limited ink/vermillion/mint
 risograph palette. It contains no readable text, logos, brands, or people.
 Generated with the factory image deployment on 2026-08-28; source prompt is
 stored beside the asset in `assets/src/hero-prompt.json`. The delivered WebP is
-optimised below 300 KB. Product icons are hand-authored inline SVG.
-
+optimised below 300 KB. A 768px WebP derivative is generated from that original
+for the mobile `srcset`; it contains no new source material. Product icons are
+hand-authored inline SVG.
