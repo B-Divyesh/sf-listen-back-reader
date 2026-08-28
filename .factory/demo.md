@@ -2,7 +2,7 @@
 
 Open `/demo` to enter the reader sample.
 
-The sample is a six-sentence original article about retaining place in dense
+The sample is a five-sentence original article about retaining place in dense
 text. It exists only in React component state. Resetting recreates that state;
 leaving `/demo` discards it. No localStorage, IndexedDB, extension storage, or
 network request is used by the demo.

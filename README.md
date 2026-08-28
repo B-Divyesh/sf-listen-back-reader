@@ -24,22 +24,35 @@ write extension data.
 ## Develop
 
 ```sh
-npm install
+npm ci
 npm run dev             # landing site
 npm run dev:extension   # Chrome extension in development
 ```
+
+The install step runs `wxt prepare`, so tests and type checking work in a clean
+checkout without requiring a build first.
 
 ## Test and build
 
 ```sh
 npm test
+npm run typecheck
+npm run lint
 npm run build
-npm run package:extension
+npm run test:extension  # loads the production extension in Chromium
+npm run test:site       # desktop, 390px, keyboard, axe, privacy, offline shell
 ```
 
 `npm run build:site` creates the deployable static site in `dist/site`.
 `npm run package:extension` puts the extension archive at
 `dist/site/downloads/listen-back-reader.zip`.
+
+Deploy the contents of `dist/site` to the configured Azure Static Web App. To
+check the deployed identity and browser behavior, run:
+
+```sh
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
+```
 
 For a local Chrome install, run `npm run build:extension`, open
 `chrome://extensions`, enable Developer mode, select **Load unpacked**, and

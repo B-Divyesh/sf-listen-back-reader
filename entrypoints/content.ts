@@ -1,4 +1,6 @@
 import { clampIndex, nextIndex, pageText, previousIndex, splitSentences } from '../src/reader';
+import { copyRestrictedMessage, isCopyRestricted } from '../src/page-policy';
+import { readerShortcutCommand, runReaderShortcut, type ReaderCommand } from '../src/reader-shortcuts';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -6,8 +8,7 @@ export default defineContentScript({
   main() {
     if (document.documentElement.getAttribute('data-listen-back')) return;
     document.documentElement.setAttribute('data-listen-back', 'ready');
-    const robots = document.querySelector('meta[name="robots"]')?.getAttribute('content')?.toLowerCase() || '';
-    const copyRestricted = robots.includes('noarchive') || Boolean(document.querySelector('[data-listen-back-no-copy]'));
+    const copyRestricted = isCopyRestricted(document);
     const sentences = splitSentences(pageText());
     let current = 0;
     let rate = 1;
@@ -62,33 +63,42 @@ export default defineContentScript({
     };
     const sendState = () => browser.runtime.sendMessage({ type: 'listen-back-state', count: sentences.length, current, text: sentences[current]?.text || '', rate }).catch(() => undefined);
 
-    browser.runtime.onMessage.addListener((message) => {
-      if (message?.type === 'listen-back-command') {
-        if (copyRestricted) return { error: 'This page asks readers not to copy its text. Listen Back will not read it.' };
+    const runCommand = (command: ReaderCommand, speakAfterMove = false) => {
+      if (command === 'next_sentence') current = nextIndex(current, sentences.length);
+      if (command === 'previous_sentence') current = previousIndex(current, sentences.length);
+      if (command === 'replay_sentence' || speakAfterMove) speak();
+      sendState(); mark();
+    };
+
+    browser.runtime.onMessage.addListener((message: unknown) => {
+      const request = message as { type?: string; command?: ReaderCommand; action?: string; index?: number };
+      if (request.type === 'listen-back-command') {
+        if (copyRestricted) return { error: copyRestrictedMessage };
         if (!sentences.length) return { error: 'No readable text found on this page.' };
-        if (message.command === 'next_sentence') current = nextIndex(current, sentences.length);
-        if (message.command === 'previous_sentence') current = previousIndex(current, sentences.length);
-        if (message.command === 'replay_sentence') speak();
-        sendState(); mark();
+        if (request.command) runCommand(request.command);
       }
-      if (message?.type === 'listen-back-control') {
-        if (copyRestricted) return { error: 'This page asks readers not to copy its text. Listen Back will not read it.' };
-        if (message.action === 'start' || message.action === 'replay') speak();
-        if (message.action === 'pause') stop();
-        if (message.action === 'next') { current = nextIndex(current, sentences.length); speak(); }
-        if (message.action === 'previous') { current = previousIndex(current, sentences.length); speak(); }
-        if (message.action === 'slow') { rate = rate === .8 ? 1 : .8; speak(); }
-        if (typeof message.index === 'number') { current = clampIndex(message.index, sentences.length); mark(); }
+      if (request.type === 'listen-back-control') {
+        if (copyRestricted) return { error: copyRestrictedMessage };
+        if (request.action === 'start' || request.action === 'replay') speak();
+        if (request.action === 'pause') stop();
+        if (request.action === 'next') { current = nextIndex(current, sentences.length); speak(); }
+        if (request.action === 'previous') { current = previousIndex(current, sentences.length); speak(); }
+        if (request.action === 'slow') { rate = rate === .8 ? 1 : .8; speak(); }
+        if (typeof request.index === 'number') { current = clampIndex(request.index, sentences.length); mark(); }
         sendState();
       }
-      if (message?.type === 'listen-back-get-state') return copyRestricted ? { count: 0, current: 0, text: '', rate, error: 'This page asks readers not to copy its text. Listen Back will not read it.' } : { count: sentences.length, current, text: sentences[current]?.text || '', rate };
+      if (request.type === 'listen-back-get-state') return copyRestricted ? { count: 0, current: 0, text: '', rate, error: copyRestrictedMessage } : { count: sentences.length, current, text: sentences[current]?.text || '', rate };
     });
 
     document.addEventListener('keydown', (event) => {
-      if (!event.altKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-      if (event.key.toLowerCase() === 'r') { event.preventDefault(); speak(); sendState(); }
-      if (event.key === 'ArrowRight') { event.preventDefault(); current = nextIndex(current, sentences.length); speak(); sendState(); }
-      if (event.key === 'ArrowLeft') { event.preventDefault(); current = previousIndex(current, sentences.length); speak(); sendState(); }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      const command = readerShortcutCommand(event);
+      if (!command) return;
+      event.preventDefault();
+      runReaderShortcut(command, copyRestricted, (shortcut) => {
+        if (!sentences.length) return;
+        runCommand(shortcut, true);
+      });
     });
   },
 });
