@@ -72,9 +72,29 @@ consumer-package checks do not apply.
 
 ## Deployment and live verification
 
-Pending the configured Azure Static Web Apps deployment. Record the deployed
-commit, live archive hash, route/response checks, and live browser matrix here
-after deployment.
+Repair commit `cfea099` was pushed to `origin/main` and deployed with
+`npm run deploy:site` to the configured `sf-listen-back-reader` Azure Static
+Web App. The production URL is
+<https://listen-back-reader.sociobot.in>.
+
+- `npm run test:deployment`: PASS. The public ZIP is HTTP 200,
+  `application/zip`, an attachment, archive-valid, and byte-identical to the
+  local package at SHA-256
+  `fd9797232c07f60c69d74ae3108d52888b5ed963610632df56e9a4f1b073c557`.
+- Live `npm run test:site`: PASS at 1440px and 390px with axe, keyboard focus,
+  privacy request capture, reduced motion, loaded-shell offline navigation,
+  and no console/page errors.
+- Live `/opt/fleet/lib/verify-url.sh`: PASS in 832 ms with title, `lang`, one
+  `h1`, `main`, image alternatives, labelled buttons, desktop/mobile captures,
+  and no console errors.
+- Live Lighthouse mobile: 100 performance, 100 accessibility, 100 best
+  practices, 100 SEO; LCP 1.4 s, CLS 0, TBT 0 ms.
+- `/`, `/demo`, `/privacy`, `/terms`, `/404.html`, `/robots.txt`, and
+  `/sitemap.xml` return 200. An unknown route returns the designed 404 with
+  HTTP 404. The download returns 200 and 506,186 bytes.
+- Live responses include HSTS, `nosniff`, strict-origin referrer policy, and
+  the same-origin CSP. Hashed assets are immutable for one year; HTML
+  revalidates after 30 seconds; the extension ZIP is `no-cache`.
 
 ## Known gaps
 
