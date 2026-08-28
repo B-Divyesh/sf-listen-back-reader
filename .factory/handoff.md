@@ -27,7 +27,7 @@ unused permission.
 
 ## What passed
 
-- All 12 exact commands in `.factory/claims.json` passed from a clean `npm ci`.
+- All 13 exact commands in `.factory/claims.json` passed from a clean `npm ci`.
   The sentence-loop test is too narrow to catch the real failure above.
 - Cold first-read and one-click `/demo` pass. The demo reset, normal/slow/next
   controls, desktop and 390px layout, no persisted demo data, no remote demo

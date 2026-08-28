@@ -60,7 +60,7 @@ the unused `storage` permission. Preserve the existing no-copy refusal.
 
 ### Claims file and exact declared tests — PASS, but insufficient
 
-`.factory/claims.json` exists and contains 12 entries. After `npm ci` from this
+`.factory/claims.json` exists and contains 13 entries. After `npm ci` from this
 clean checkout, every exact `test` command passed:
 
 | Claim ID | Result |
