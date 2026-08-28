@@ -10,6 +10,7 @@ describe('static deployment response policy', () => {
       expect.objectContaining({ route: '/demo', rewrite: '/index.html' }),
       expect.objectContaining({ route: '/privacy', rewrite: '/index.html' }),
       expect.objectContaining({ route: '/terms', rewrite: '/index.html' }),
+      expect.objectContaining({ route: '/downloads/*', headers: expect.objectContaining({ 'Content-Disposition': 'attachment' }) }),
     ]));
     expect(config.responseOverrides?.['404']).toEqual({ rewrite: '/404.html', statusCode: 404 });
 
@@ -17,5 +18,12 @@ describe('static deployment response policy', () => {
     expect(notFound).toContain('<html lang="en">');
     expect(notFound).toContain('<main id="main">');
     expect(notFound.match(/<h1[ >]/g)).toHaveLength(1);
+  });
+
+  it('makes a release verify the public ZIP that the landing page links to', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.scripts['deploy:site']).toContain('swa deploy dist/site');
+    expect(pkg.scripts['deploy:site']).toContain('npm run test:deployment');
+    expect(pkg.scripts['test:deployment']).toBe('node scripts/verify-deployment.mjs');
   });
 });

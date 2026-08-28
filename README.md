@@ -47,11 +47,21 @@ npm run test:site       # desktop, 390px, keyboard, axe, privacy, offline shell
 `npm run package:extension` puts the extension archive at
 `dist/site/downloads/listen-back-reader.zip`.
 
-Deploy the contents of `dist/site` to the configured Azure Static Web App. To
-check the deployed identity and browser behavior, run:
+Deploy the exact `dist/site` directory (including `downloads/`) to the
+configured Azure Static Web App. The release command builds the archive,
+deploys that directory, and refuses success unless the public download is an
+HTTP 200 ZIP with the same byte hash:
+
+```sh
+npm run deploy:site
+```
+
+To independently check the deployed archive, site identity, and browser
+behavior, run:
 
 ```sh
 VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
 ```
 
 For a local Chrome install, run `npm run build:extension`, open
