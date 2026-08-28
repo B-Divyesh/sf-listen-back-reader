@@ -10,7 +10,7 @@ describe('static deployment response policy', () => {
       expect.objectContaining({ route: '/demo', rewrite: '/index.html' }),
       expect.objectContaining({ route: '/privacy', rewrite: '/index.html' }),
       expect.objectContaining({ route: '/terms', rewrite: '/index.html' }),
-      expect.objectContaining({ route: '/downloads/*', headers: expect.objectContaining({ 'Content-Disposition': 'attachment' }) }),
+      expect.objectContaining({ route: '/downloads/*', headers: { 'Cache-Control': 'no-cache', 'Content-Disposition': 'attachment' } }),
     ]));
     expect(config.responseOverrides?.['404']).toEqual({ rewrite: '/404.html', statusCode: 404 });
 
