@@ -22,9 +22,14 @@ describe('static deployment response policy', () => {
 
   it('makes a release verify the public ZIP that the landing page links to', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-    expect(pkg.scripts['deploy:site']).toContain('swa deploy dist/site');
-    expect(pkg.scripts['deploy:site']).toContain('--resource-group sociobot');
+    expect(pkg.scripts['deploy:site']).toContain('node scripts/deploy-site.mjs');
     expect(pkg.scripts['deploy:site']).toContain('npm run test:deployment');
     expect(pkg.scripts['test:deployment']).toBe('node scripts/verify-deployment.mjs');
+
+    const deployment = readFileSync('scripts/deploy-site.mjs', 'utf8');
+    expect(deployment).toContain("const resourceGroup = 'sociobot'");
+    expect(deployment).toContain("const appName = 'sf-listen-back-reader'");
+    expect(deployment).toContain("'deploy', 'dist/site'");
+    expect(deployment).toContain('SWA_CLI_DEPLOYMENT_TOKEN: deploymentToken');
   });
 });
