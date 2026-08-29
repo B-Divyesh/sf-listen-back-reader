@@ -15,11 +15,13 @@ const server = createServer((request, response) => {
       : '';
   const meta = protection.startsWith('<meta') ? protection : '';
   const attribute = protection === 'data-no-copy' ? protection : '';
-  const article = request.url === '/boundaries'
+  const article = request.url === '/midway'
+    ? Array.from({ length: 12 }, (_, index) => `<p style="height:180px">Sentence ${index + 1} is placed in this long article. </p>`).join('')
+    : request.url === '/boundaries'
     ? 'Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.'
     : 'First sentence is brief. Second sentence is the current reading target. Third sentence closes the paragraph.';
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}<style>p{width:260px;font:20px/1.5 monospace}</style></head><body><main ${attribute}><p>${article}</p></main></body></html>`);
+  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}<style>p{width:260px;font:20px/1.5 monospace}</style></head><body><main ${attribute}>${request.url === '/midway' ? article : `<p>${article}</p>`}</main></body></html>`);
 });
 
 await new Promise((resolveReady) => server.listen(0, '127.0.0.1', resolveReady));
@@ -86,6 +88,13 @@ try {
   if (await normal.locator('html[data-listen-back]').count()) {
     throw new Error('The article was inspected before the reader was explicitly invoked.');
   }
+  await normal.evaluate(() => {
+    const text = document.querySelector('p')?.firstChild;
+    if (!text) throw new Error('The fixture lacks source text.');
+    const range = document.createRange();
+    range.setStart(text, 0); range.setEnd(text, 'First sentence is brief.'.length);
+    const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+  });
   await activate(normal);
   await normal.keyboard.press('Alt+R');
   await normal.locator('#listen-back-marker').waitFor();
@@ -156,12 +165,27 @@ try {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   await popup.locator('button').first().waitFor();
+  if (await popup.locator('main').count() !== 1 || await popup.locator('h1').count() !== 1 || await popup.locator('h1').innerText() !== 'Read one sentence') {
+    throw new Error('The popup is missing its semantic Read one sentence heading.');
+  }
   const undersized = await popup.locator('button').evaluateAll((buttons) => buttons
     .map((button) => ({ label: button.getAttribute('aria-label') || button.textContent?.trim(), height: button.getBoundingClientRect().height }))
     .filter(({ height }) => height < 44));
   if (undersized.length) throw new Error(`Popup touch targets below 44px: ${JSON.stringify(undersized)}`);
   await popup.close();
   await normal.close();
+
+  const midway = await context.newPage();
+  await midway.goto(`${origin}/midway`);
+  await midway.evaluate(() => scrollTo(0, 900));
+  await activate(midway);
+  await midway.keyboard.press('Alt+R');
+  await midway.locator('#listen-back-marker').waitFor();
+  const midwayLabel = await midway.locator('#listen-back-marker').getAttribute('aria-label');
+  if (!midwayLabel?.includes('Sentence 6') && !midwayLabel?.includes('Sentence 7')) {
+    throw new Error(`The reader did not start near the visible viewport centre: ${midwayLabel}`);
+  }
+  await midway.close();
 
   const boundarySource = 'Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.';
   const boundary = await context.newPage();
@@ -170,6 +194,13 @@ try {
   if (await boundary.locator('html[data-listen-back]').count()) {
     throw new Error('The dense article was inspected before explicit keyboard invocation.');
   }
+  await boundary.evaluate(() => {
+    const text = document.querySelector('p')?.firstChild;
+    if (!text) throw new Error('The boundary fixture lacks source text.');
+    const range = document.createRange();
+    range.setStart(text, 0); range.setEnd(text, 'Dr. Smith reviewed the report at 3 p.m.'.length);
+    const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+  });
   await activate(boundary);
   await boundary.keyboard.press('Alt+R');
   await boundary.locator('#listen-back-marker').waitFor();

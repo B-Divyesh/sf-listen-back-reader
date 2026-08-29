@@ -145,8 +145,19 @@ describe('static deployment response policy', () => {
       readFileSync('entrypoints/content.ts', 'utf8'),
       readFileSync('entrypoints/popup/main.tsx', 'utf8'),
     ].join('\n');
-    expect(extensionRuntime).toContain('let current = 0');
+    expect(extensionRuntime).toContain('let current = initialSentence()');
     expect(extensionRuntime).toContain('let rate = 1');
     expect(extensionRuntime).not.toMatch(/localStorage|sessionStorage|indexedDB|browser\.storage/);
+  });
+
+  it('@claim:desktop-chromium-install documents the desktop Chromium install path for the MV3 download', () => {
+    const readme = readFileSync('README.md', 'utf8');
+    const landing = readFileSync('src/site.tsx', 'utf8');
+    const manifest = readFileSync('wxt.config.ts', 'utf8');
+    expect(readme).toContain('desktop Chrome or Chromium');
+    expect(readme).toContain('Extract the ZIP');
+    expect(readme).toContain('Load unpacked');
+    expect(landing).toContain('Desktop Chrome or Chromium only');
+    expect(readFileSync('wxt.config.ts', 'utf8')).toContain("permissions: ['activeTab', 'scripting']");
   });
 });

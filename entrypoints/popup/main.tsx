@@ -30,7 +30,7 @@ function App() {
     } catch { setError('The page changed. Reload it, then try again.'); }
   };
   return <main>
-    <header><span className="brand-mark" aria-hidden="true">◉</span><div><strong>Listen Back</strong><small>source-anchored reader</small></div></header>
+    <header><span className="brand-mark" aria-hidden="true">◉</span><div><span className="popup-wordmark">Listen Back</span><h1>Read one sentence</h1></div></header>
     <section className="status" aria-live="polite">
       {error ? <p className="error">{error}</p> : state.count ? <><p className="eyebrow">Sentence {state.current + 1} of {state.count}</p><p className="quote">{state.text}</p></> : <p>Checking this page…</p>}
     </section>

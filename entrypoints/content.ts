@@ -13,7 +13,29 @@ export default defineContentScript({
     const sentences = copyRestricted ? [] : splitSentences(pageText());
     const sourceElement = pageSourceElement();
     const sources = sourceElement ? locateSentenceSources(sentences.map(({ text }) => text), sourceElement) : [];
-    let current = 0;
+    const initialSentence = () => {
+      const selection = document.getSelection();
+      if (selection?.rangeCount && selection.anchorNode?.isConnected) {
+        const chosen = selection.getRangeAt(0);
+        const selected = sources.findIndex((source) => Boolean(source && (source.range.intersectsNode(chosen.startContainer) || source.range.intersectsNode(chosen.endContainer))));
+        if (selected >= 0) return selected;
+      }
+      const centre = window.innerHeight / 2;
+      let nearest = 0;
+      let distance = Number.POSITIVE_INFINITY;
+      sources.forEach((source, index) => {
+        if (!source) return;
+        const { range } = source;
+        const rects = typeof range.getClientRects === 'function' ? [...range.getClientRects()] : [];
+        if (!rects.length) return;
+        const top = Math.min(...rects.map((rect) => rect.top));
+        const bottom = Math.max(...rects.map((rect) => rect.bottom));
+        const candidate = centre < top ? top - centre : centre > bottom ? centre - bottom : 0;
+        if (candidate < distance) { distance = candidate; nearest = index; }
+      });
+      return nearest;
+    };
+    let current = initialSentence();
     let rate = 1;
     let marker: HTMLDivElement | undefined;
     let observedElement: Element | undefined;

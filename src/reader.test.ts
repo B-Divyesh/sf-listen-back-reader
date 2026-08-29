@@ -27,6 +27,13 @@ describe('sentence reading loop', () => {
     expect(sentences.map(({ text }) => text).join(' ')).toBe(source);
   });
 
+  it('keeps an initialism joined when it is followed by a capitalized name', () => {
+    expect(splitSentences('The U.S. Census Bureau released a report. Readers discussed it.').map(({ text }) => text)).toEqual([
+      'The U.S. Census Bureau released a report.',
+      'Readers discussed it.',
+    ]);
+  });
+
   it('does not leave the available sentence range', () => {
     expect(nextIndex(2, 3)).toBe(2);
     expect(previousIndex(0, 3)).toBe(0);
@@ -165,6 +172,15 @@ describe('content-script protected-page keyboard regression', () => {
     document.documentElement.removeAttribute('data-listen-back');
     document.head.innerHTML = '';
     document.body.innerHTML = '<main><p>First sentence is brief. Second <em>sentence is the current</em> reading target. Third sentence closes the paragraph.</p></main>';
+    const selectedText = document.querySelector('p')?.firstChild;
+    if (selectedText) {
+      const selection = document.getSelection();
+      const range = document.createRange();
+      range.setStart(selectedText, 0);
+      range.setEnd(selectedText, 'First sentence is brief.'.length);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
 
     let main: (() => void) | undefined;
     let receive: ((message: unknown) => unknown) | undefined;

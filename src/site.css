@@ -2,3 +2,5 @@
 
 .demo-banner button{min-height:44px}
 .site-header a,.site-footer a{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center}
+.reader-controls{border-top:0;border-bottom:2px solid var(--ink)}
+@media(max-width:760px){.site-header{align-items:flex-start;flex-direction:column;padding-top:8px;padding-bottom:8px;gap:0}.site-header nav{gap:14px}.site-header nav a:nth-child(2),.site-header nav a:last-child{display:inline-flex}}

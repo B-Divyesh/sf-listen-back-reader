@@ -41,25 +41,37 @@ async function openDemo(): Promise<DemoPage> {
     });
     (window as unknown as Window & { __listenBackSpeechCalls: Array<{ text: string; rate: number }> }).__listenBackSpeechCalls = calls;
   });
-  await page.goto(`${baseUrl}/demo`);
+  await page.goto(`${baseUrl}/?demo=1`);
   return { context, page, requests };
 }
 
 describe('browser demo sandbox', () => {
+  it('enters the isolated sample directly from ?demo=1 and keeps reading controls in the first mobile view', async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    try {
+      await page.goto(`${baseUrl}/?demo=1`);
+      expect(await page.getByText('Demo — sample data, nothing is saved.').isVisible()).toBe(true);
+      const control = page.getByRole('button', { name: 'Read highlighted sentence' });
+      expect(await control.isVisible()).toBe(true);
+      expect((await control.boundingBox())?.y).toBeLessThan(844);
+    } finally { await context.close(); }
+  });
+
   it('reads exactly one source sentence per step in the sample', async () => {
     const { context, page } = await openDemo();
     try {
       await expect(page.locator('.sample-text p').allTextContents()).resolves.toEqual([
-        'A dense page asks readers to hold several ideas at once.',
-        "When attention slips, starting at the paragraph's beginning wastes energy.",
-        'Listen Back Reader holds one sentence in view.',
-        'Replay it, slow it down, or move forward when you are ready.',
-        'The source page stays the source.',
+        "On 14 March 2026, Dr. Mira Patel presented the city library's new late-hours plan to the East Ward council.",
+        'The pilot keeps the study floor open until 9 p.m. on Tuesdays and Thursdays for six weeks.',
+        'Patel said the $2.4 million proposal uses existing staff schedules, not new surveillance software.',
+        'The U.S. Census Bureau estimates that 38% of nearby households have no quiet room for study.',
+        'Council members will vote after the public comment session on 2 April.',
       ]);
-      await expect(page.locator('[aria-current="true"]').innerText()).resolves.toBe('Listen Back Reader holds one sentence in view.');
+      await expect(page.locator('[aria-current="true"]').innerText()).resolves.toBe('Patel said the $2.4 million proposal uses existing staff schedules, not new surveillance software.');
       await page.getByRole('button', { name: 'Next sentence' }).click();
       expect(await page.getByText('Sentence 4 / 5').isVisible()).toBe(true);
-      await expect(page.locator('[aria-current="true"]').innerText()).resolves.toBe('Replay it, slow it down, or move forward when you are ready.');
+      await expect(page.locator('[aria-current="true"]').innerText()).resolves.toBe('The U.S. Census Bureau estimates that 38% of nearby households have no quiet room for study.');
       expect(await page.locator('[aria-current="true"]').count()).toBe(1);
     } finally { await context.close(); }
   });
@@ -68,7 +80,7 @@ describe('browser demo sandbox', () => {
     const { context, page } = await openDemo();
     try {
       const visibleSentence = await page.locator('[aria-current="true"]').innerText();
-      await page.getByRole('button', { name: 'Read sentence' }).click();
+      await page.getByRole('button', { name: 'Read highlighted sentence' }).click();
       await page.waitForFunction(() => (window as unknown as Window & { __listenBackSpeechCalls: unknown[] }).__listenBackSpeechCalls.length === 1);
       await expect(page.evaluate(() => (window as unknown as Window & { __listenBackSpeechCalls: Array<{ text: string; rate: number }> }).__listenBackSpeechCalls[0])).resolves.toEqual({ text: visibleSentence, rate: 1 });
     } finally { await context.close(); }
@@ -77,7 +89,7 @@ describe('browser demo sandbox', () => {
   it('@claim:local-text keeps demo reading and network requests on this origin', async () => {
     const { context, page, requests } = await openDemo();
     try {
-      await page.getByRole('button', { name: 'Read sentence' }).click();
+      await page.getByRole('button', { name: 'Read highlighted sentence' }).click();
       await page.getByRole('button', { name: 'Next sentence' }).click();
       expect(requests.length).toBeGreaterThan(0);
       expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);
@@ -87,10 +99,10 @@ describe('browser demo sandbox', () => {
   it('@claim:free-account-free opens the complete sample without sign-in or payment', async () => {
     const { context, page, requests } = await openDemo();
     try {
-      expect(await page.getByRole('heading', { level: 1, name: 'Hear one sentence at a time.' }).isVisible()).toBe(true);
-      expect(await page.getByRole('button', { name: 'Read sentence' }).isEnabled()).toBe(true);
+      expect(await page.getByRole('heading', { level: 1, name: 'Read one highlighted sentence.' }).isVisible()).toBe(true);
+      expect(await page.getByRole('button', { name: 'Read highlighted sentence' }).isEnabled()).toBe(true);
       expect(await page.locator('form, [href*="login"], [href*="sign-in"], [href*="checkout"], [href*="billing"]').count()).toBe(0);
-      await page.getByRole('button', { name: 'Start for real' }).click();
+      await page.getByRole('button', { name: 'Install the extension' }).click();
       expect(await page.getByText('Free and account-free.').isVisible()).toBe(true);
       expect(await page.getByRole('link', { name: 'Download extension zip' }).getAttribute('href')).toBe('/downloads/listen-back-reader.zip');
       expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);

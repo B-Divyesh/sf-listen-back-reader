@@ -15,7 +15,7 @@ export function splitSentences(text: string): Sentence[] {
   const pieces: string[] = [];
   for (const segment of segmented) {
     const previous = pieces.at(-1);
-    if (previous && /(?:^|\s)(?:Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Jr|St|Mt|Capt|Gen|Lt|Col|Sgt|Rev|Hon)\.$/i.test(previous)) {
+    if (previous && /(?:(?:^|\s)(?:Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Jr|St|Mt|Capt|Gen|Lt|Col|Sgt|Rev|Hon)\.|(?:[A-Z]\.){2,})$/.test(previous)) {
       pieces[pieces.length - 1] = `${previous} ${segment}`;
     } else {
       pieces.push(segment);

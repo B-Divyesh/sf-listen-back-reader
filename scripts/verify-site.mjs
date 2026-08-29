@@ -19,12 +19,23 @@ async function verifyViewport(width, height) {
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => requests.push(request.url()));
 
-  for (const route of ['/', '/demo', '/privacy', '/terms', '/missing-page']) {
+  const routeHeads = {
+    '/': ['Listen Back Reader — replay one sentence', 'https://listen-back-reader.sociobot.in/'],
+    '/demo?demo=1': ['Demo — Listen Back Reader', 'https://listen-back-reader.sociobot.in/demo'],
+    '/privacy': ['Privacy — Listen Back Reader', 'https://listen-back-reader.sociobot.in/privacy'],
+    '/terms': ['Terms — Listen Back Reader', 'https://listen-back-reader.sociobot.in/terms'],
+    '/missing-page': ['Page not found — Listen Back Reader', 'https://listen-back-reader.sociobot.in/404'],
+  };
+  for (const [route, [title, canonical]] of Object.entries(routeHeads)) {
     checkingExpected404 = route === '/missing-page';
     await page.goto(`${baseUrl}${route}`);
     if (await page.locator('main').count() !== 1) throw new Error(`${route} does not have exactly one main landmark.`);
     if (await page.locator('h1').count() !== 1) throw new Error(`${route} does not have exactly one h1.`);
-    if (!await page.title() || await page.getAttribute('html', 'lang') !== 'en') throw new Error(`${route} is missing title or language metadata.`);
+    if (await page.title() !== title || await page.getAttribute('html', 'lang') !== 'en') throw new Error(`${route} is missing title or language metadata.`);
+    if (await page.locator('link[rel="canonical"]').getAttribute('href') !== canonical) throw new Error(`${route} has the wrong canonical URL.`);
+    for (const selector of ['meta[property="og:title"]', 'meta[property="og:description"]', 'meta[property="og:url"]', 'meta[property="og:image"]', 'meta[name="twitter:title"]', 'meta[name="twitter:description"]', 'meta[name="twitter:image"]']) {
+      if (!await page.locator(selector).getAttribute('content')) throw new Error(`${route} is missing ${selector}.`);
+    }
     if (await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) throw new Error(`${route} overflows at ${width}px.`);
     if (await page.locator('img:not([alt])').count()) throw new Error(`${route} has an image without alt text.`);
     await page.addScriptTag({ path: axePath });
@@ -35,7 +46,8 @@ async function verifyViewport(width, height) {
   }
   checkingExpected404 = false;
 
-  await page.goto(`${baseUrl}/demo`);
+  await page.goto(`${baseUrl}/demo?demo=1`);
+  if (!await page.getByRole('button', { name: 'Read highlighted sentence' }).isVisible()) throw new Error('Demo does not expose the read control immediately.');
   await page.getByRole('link', { name: 'Privacy' }).first().click();
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
   await page.goBack();
@@ -44,6 +56,12 @@ async function verifyViewport(width, height) {
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
   await page.goBack();
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
+  for (const from of ['/demo?demo=1', '/privacy', '/terms']) {
+    await page.goto(`${baseUrl}${from}`);
+    await page.getByRole('link', { name: 'How it works' }).click();
+    if (new URL(page.url()).pathname !== '/') throw new Error(`How it works did not return home from ${from}.`);
+    await page.waitForFunction(() => document.activeElement?.id === 'how-heading');
+  }
   const smallTargets = await page.locator('a:visible, button:visible').evaluateAll((elements) => elements
     .map((element) => ({ label: element.getAttribute('aria-label') || element.textContent?.trim(), width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }))
     .filter(({ width: targetWidth, height: targetHeight }) => targetWidth < 44 || targetHeight < 44));

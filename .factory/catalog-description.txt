@@ -1,0 +1,1 @@
+Replay one web sentence at a time while a browser extension marks your place.
