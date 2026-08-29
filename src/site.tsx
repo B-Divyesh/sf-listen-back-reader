@@ -96,10 +96,10 @@ function Footer({ go }: { go: (path: string) => void }) {
   </footer>;
 }
 
-function DemoBanner({ reset, install }: { reset: () => void; install: () => void }) {
+function DemoBanner({ reset, startForReal }: { reset: () => void; startForReal: () => void }) {
   return <aside className="demo-banner" aria-label="Demo mode">
     <span><b>Demo</b> — sample data, nothing is saved.</span>
-    <span><button id="reset-demo" onClick={reset}>Reset demo</button><button id="demo-install" onClick={install}>Install the extension</button></span>
+    <span><button id="reset-demo" onClick={reset}>Reset demo</button><button id="demo-start" onClick={startForReal}>Start for real</button></span>
   </aside>;
 }
 
@@ -197,7 +197,7 @@ function Home({ go }: { go: (path: string) => void }) {
 
 function Demo({ go }: { go: (path: string) => void }) {
   const [key, setKey] = useState(0);
-  return <><DemoBanner reset={() => setKey((value) => value + 1)} install={() => go('/#install')} /><main id="main" tabIndex={-1} className="demo-page"><p className="kicker">Sample article</p><h1 id="demo-heading" tabIndex={-1}>Read one highlighted sentence.</h1><p className="lede">Try browser speech on a city library report. The sample stays separate from your data.</p><ReaderDemo key={key} /><p className="help">Use the controls above the article to replay, stop, change speed, or move through its sentences.</p></main></>;
+  return <><DemoBanner reset={() => setKey((value) => value + 1)} startForReal={() => go('/#install')} /><main id="main" tabIndex={-1} className="demo-page"><p className="kicker">Sample article</p><h1 id="demo-heading" tabIndex={-1}>Read one highlighted sentence.</h1><p className="lede">Try browser speech on a city library report. The sample stays separate from your data.</p><ReaderDemo key={key} /><p className="help">Use the controls above the article to replay, stop, change speed, or move through its sentences.</p></main></>;
 }
 
 function Legal({ kind }: { kind: 'privacy' | 'terms' }) {

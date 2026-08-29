@@ -58,7 +58,7 @@ original fixture copy and each remains below the 22-word cap.
 | --- | ---: | --- |
 | Demo — sample data, nothing is saved. | 6 | — |
 | Reset demo | 2 | — |
-| Install the extension | 3 | — |
+| Start for real | 3 | — |
 | Read one highlighted sentence. | 4 | — |
 | Try browser speech on a city library report. | 8 | — |
 | The sample stays separate from your data. | 8 | — |

@@ -19,9 +19,14 @@ const server = createServer((request, response) => {
     ? Array.from({ length: 12 }, (_, index) => `<p style="height:180px">Sentence ${index + 1} is placed in this long article. </p>`).join('')
     : request.url === '/boundaries'
     ? 'Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.'
+    : request.url === '/article-structure'
+    ? '<article><h1>Library update</h1><p>First paragraph ends here.</p><p>Second <em>paragraph starts</em> here.</p><p hidden>Hidden advertising sentence.</p><p style="display:none">CSS-hidden advertising sentence.</p><p aria-hidden="true">Assistive-hidden advertising sentence.</p><p>Third paragraph closes here.</p></article>'
+    : request.url === '/empty'
+    ? ''
     : 'First sentence is brief. Second sentence is the current reading target. Third sentence closes the paragraph.';
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}<style>p{width:260px;font:20px/1.5 monospace}</style></head><body><main ${attribute}>${request.url === '/midway' ? article : `<p>${article}</p>`}</main></body></html>`);
+  const fixture = request.url === '/midway' || request.url === '/article-structure' ? article : `<p>${article}</p>`;
+  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}<style>p{width:260px;font:20px/1.5 monospace}</style></head><body><main ${attribute}>${fixture}</main></body></html>`);
 });
 
 await new Promise((resolveReady) => server.listen(0, '127.0.0.1', resolveReady));
@@ -215,6 +220,24 @@ try {
   if (await popup.locator('main').count() !== 1 || await popup.locator('h1').count() !== 1 || await popup.locator('h1').innerText() !== 'Read one sentence') {
     throw new Error('The popup is missing its semantic Read one sentence heading.');
   }
+  // A directly opened popup is a browser tab in this harness, unlike a real
+  // toolbar popup. Restore the article as Chrome's active tab, then exercise
+  // the popup's real Refresh recovery path and message handshake.
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not restore active article tab ${url}`);
+    await chrome.tabs.update(tab.id, { active: true });
+  }, normal.url());
+  await popup.getByRole('button', { name: 'Refresh page' }).click();
+  await popup.getByText('Sentence 1 of 3').waitFor();
+  if (await popup.locator('.quote').innerText() !== 'First sentence is brief.') {
+    throw new Error('The installed popup did not receive the active article sentence.');
+  }
+  await popup.getByRole('button', { name: 'Use 0.8× speed' }).click();
+  await popup.getByRole('button', { name: 'Use normal speed' }).waitFor();
+  await popup.getByRole('button', { name: 'Stop reading' }).waitFor();
+  await popup.getByRole('button', { name: 'Stop reading' }).click();
+  await popup.getByRole('button', { name: 'Read sentence' }).waitFor();
   const popupEntry = productionManifest.action?.default_popup;
   const popupHtml = popupEntry ? readFileSync(join(extensionPath, popupEntry), 'utf8') : '';
   const popupScript = popupHtml.match(/src="([^"]+\.js)"/)?.[1];
@@ -306,6 +329,66 @@ try {
     throw new Error(`Dense punctuation was not source-faithful: ${JSON.stringify(spoken)}`);
   }
   await boundary.close();
+
+  // This is the independent verifier's production fixture: adjacent minified
+  // blocks must keep their source boundary, inline wording, and marker.
+  const structured = await context.newPage();
+  await structured.goto(`${origin}/article-structure`);
+  await structured.evaluate(() => {
+    const text = document.querySelector('h1')?.firstChild;
+    if (!text) throw new Error('The structured fixture lacks a heading text node.');
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const selection = getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await activate(structured);
+  const structuredState = await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find structured fixture tab ${url}`);
+    return chrome.tabs.sendMessage(tab.id, { type: 'listen-back-get-state' });
+  }, structured.url());
+  if (!structuredState || structuredState.count !== 4 || structuredState.text !== 'Library update') {
+    throw new Error(`The installed reader did not return visible block state: ${JSON.stringify(structuredState)}`);
+  }
+  await structured.keyboard.press('Alt+R');
+  await structured.locator('#listen-back-marker').waitFor();
+  const structuredLabels = [await structured.locator('#listen-back-marker').getAttribute('aria-label')];
+  for (let index = 0; index < 3; index += 1) {
+    await structured.keyboard.press('Alt+ArrowRight');
+    await structured.waitForFunction((previous) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== previous, structuredLabels.at(-1));
+    structuredLabels.push(await structured.locator('#listen-back-marker').getAttribute('aria-label'));
+  }
+  for (let index = 0; index < 3; index += 1) {
+    await structured.keyboard.press('Alt+ArrowLeft');
+  }
+  await structured.waitForFunction(() => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') === 'Current sentence: Library update');
+  if (JSON.stringify(structuredLabels) !== JSON.stringify([
+    'Current sentence: Library update',
+    'Current sentence: First paragraph ends here.',
+    'Current sentence: Second paragraph starts here.',
+    'Current sentence: Third paragraph closes here.',
+  ])) {
+    throw new Error(`Adjacent blocks, inline text, or hidden text lost source fidelity: ${JSON.stringify(structuredLabels)}`);
+  }
+  await structured.close();
+
+  const empty = await context.newPage();
+  await empty.goto(`${origin}/empty`);
+  await activate(empty);
+  const emptyState = await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find empty fixture tab ${url}`);
+    return chrome.tabs.sendMessage(tab.id, { type: 'listen-back-get-state' });
+  }, empty.url());
+  if (!emptyState || emptyState.count !== 0 || emptyState.text !== '') {
+    throw new Error(`The installed reader does not recover cleanly on an empty article: ${JSON.stringify(emptyState)}`);
+  }
+  await empty.keyboard.press('Alt+R');
+  await empty.waitForTimeout(100);
+  if (await empty.locator('#listen-back-marker').count()) throw new Error('The installed reader marked an empty article.');
+  await empty.close();
 
   await verifyBlocked('/noarchive');
   await verifyBlocked('/no-copy');

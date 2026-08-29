@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clampIndex, nextIndex, pageText, previousIndex, speakSentence, splitSentences } from './reader';
+import { clampIndex, nextIndex, pageSentences, pageText, previousIndex, speakSentence, splitSentences } from './reader';
 import { isCopyRestricted } from './page-policy';
 import { readerShortcutCommand, runReaderShortcut } from './reader-shortcuts';
 
@@ -56,11 +56,17 @@ describe('sentence reading loop', () => {
     expect(nextIndex(1, 3)).toBe(2);
   });
 
-  it('@claim:readable-text finds readable article text before surrounding page chrome', () => {
+  it('@claim:readable-text finds ordered visible article blocks before surrounding page chrome', () => {
     const request = vi.fn();
     vi.stubGlobal('fetch', request);
-    document.body.innerHTML = '<nav>Navigation words.</nav><article>Source text stays in this browser.</article><aside>Related links.</aside>';
-    expect(pageText()).toBe('Source text stays in this browser.');
+    document.body.innerHTML = '<nav>Navigation words.</nav><article><h1>Library update</h1><p>First paragraph ends here.</p><p>Second <em>paragraph starts</em> here.</p><p hidden>Hidden advertising sentence.</p><p style="display:none">CSS-hidden advertising sentence.</p><p aria-hidden="true">Assistive-hidden advertising sentence.</p><p>Third paragraph closes here.</p></article><aside>Related links.</aside>';
+    expect(pageText()).toBe('Library update First paragraph ends here. Second paragraph starts here. Third paragraph closes here.');
+    expect(pageSentences().map(({ text }) => text)).toEqual([
+      'Library update',
+      'First paragraph ends here.',
+      'Second paragraph starts here.',
+      'Third paragraph closes here.',
+    ]);
     expect(request).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { clampIndex, nextIndex, pageSourceElement, pageText, previousIndex, splitSentences } from '../src/reader';
+import { clampIndex, nextIndex, pageSentences, pageSourceElement, previousIndex } from '../src/reader';
 import { copyRestrictedMessage, isCopyRestricted } from '../src/page-policy';
 import { readerShortcutCommand, runReaderShortcut, type ReaderCommand } from '../src/reader-shortcuts';
 import { locateSentenceSources } from '../src/source-range';
@@ -10,7 +10,7 @@ export default defineContentScript({
     if (document.documentElement.getAttribute('data-listen-back')) return;
     document.documentElement.setAttribute('data-listen-back', 'ready');
     const copyRestricted = isCopyRestricted(document);
-    const sentences = copyRestricted ? [] : splitSentences(pageText());
+    const sentences = copyRestricted ? [] : pageSentences();
     const sourceElement = pageSourceElement();
     const sources = sourceElement ? locateSentenceSources(sentences.map(({ text }) => text), sourceElement) : [];
     const initialSentence = () => {
@@ -178,25 +178,44 @@ export default defineContentScript({
       sendState(); mark();
     };
 
-    browser.runtime.onMessage.addListener((message: unknown) => {
+    // Chromium event listeners must use sendResponse. Returning an object (or
+    // Promise) only works in some extension runtimes and leaves the popup
+    // waiting forever in a packaged MV3 extension.
+    type SendResponse = (response: unknown) => void;
+    const messageEvent = browser.runtime.onMessage as unknown as {
+      addListener(listener: (message: unknown, sender: unknown, sendResponse?: SendResponse) => unknown): void;
+    };
+    messageEvent.addListener((message: unknown, _sender: unknown, sendResponse?: SendResponse) => {
       const request = message as { type?: string; command?: ReaderCommand; action?: string; index?: number };
+      let response: unknown = state();
       if (request.type === 'listen-back-command') {
-        if (copyRestricted) return { error: copyRestrictedMessage };
-        if (!sentences.length) return { error: 'No readable text found on this page.' };
-        if (request.command) runCommand(request.command, true);
+        if (copyRestricted) response = { error: copyRestrictedMessage };
+        else if (!sentences.length) response = { error: 'No readable text found on this page.' };
+        else {
+          if (request.command) runCommand(request.command, true);
+          response = state();
+        }
       }
       if (request.type === 'listen-back-control') {
-        if (copyRestricted) return { error: copyRestrictedMessage };
-        if (request.action === 'start' || request.action === 'replay') speak();
-        if (request.action === 'stop' || request.action === 'pause') stop();
-        if (request.action === 'next') { current = nextIndex(current, sentences.length); speak(); }
-        if (request.action === 'previous') { current = previousIndex(current, sentences.length); speak(); }
-        if (request.action === 'slow') { rate = rate === .8 ? 1 : .8; speak(); }
-        if (typeof request.index === 'number') { current = clampIndex(request.index, sentences.length); mark(); }
-        sendState();
-        return state();
+        if (copyRestricted) response = { error: copyRestrictedMessage };
+        else if (!sentences.length) response = { error: 'No readable text found on this page.' };
+        else {
+          if (request.action === 'start' || request.action === 'replay') speak();
+          if (request.action === 'stop' || request.action === 'pause') stop();
+          if (request.action === 'next') { current = nextIndex(current, sentences.length); speak(); }
+          if (request.action === 'previous') { current = previousIndex(current, sentences.length); speak(); }
+          if (request.action === 'slow') { rate = rate === .8 ? 1 : .8; speak(); }
+          if (typeof request.index === 'number') { current = clampIndex(request.index, sentences.length); mark(); }
+          sendState();
+          response = state();
+        }
       }
-      if (request.type === 'listen-back-get-state') return copyRestricted ? { ...state(), count: 0, text: '', error: copyRestrictedMessage } : state();
+      if (request.type === 'listen-back-get-state') response = copyRestricted ? { ...state(), count: 0, text: '', error: copyRestrictedMessage } : state();
+      if (sendResponse) {
+        sendResponse(response);
+        return true;
+      }
+      return response;
     });
 
     document.addEventListener('keydown', (event) => {

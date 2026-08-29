@@ -47,7 +47,7 @@ async function openDemo(): Promise<DemoPage> {
 }
 
 describe('browser demo sandbox', () => {
-  it('enters the isolated sample directly from ?demo=1 and keeps reading controls in the first mobile view', async () => {
+  it('@claim:mobile-demo works at a 390px mobile viewport from the direct demo URL', async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     try {
@@ -116,7 +116,7 @@ describe('browser demo sandbox', () => {
       expect(await page.getByRole('heading', { level: 1, name: 'Read one highlighted sentence.' }).isVisible()).toBe(true);
       expect(await page.getByRole('button', { name: 'Read highlighted sentence' }).isEnabled()).toBe(true);
       expect(await page.locator('form, [href*="login"], [href*="sign-in"], [href*="checkout"], [href*="billing"]').count()).toBe(0);
-      await page.getByRole('button', { name: 'Install the extension' }).click();
+      await page.getByRole('button', { name: 'Start for real' }).click();
       expect(await page.getByText('Free and account-free.').isVisible()).toBe(true);
       expect(await page.getByRole('link', { name: 'Download extension zip' }).getAttribute('href')).toBe('/downloads/listen-back-reader.zip');
       expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);

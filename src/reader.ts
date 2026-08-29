@@ -1,3 +1,5 @@
+import { readableSourceUnits, readableText } from './source-range';
+
 export type Sentence = { id: number; text: string };
 
 /** Splits visible prose into speakable chunks without changing source text. */
@@ -41,12 +43,24 @@ export function previousIndex(index: number, length: number): number {
 }
 
 export function pageText(): string {
-  const article = document.querySelector('article, [role="main"], main');
-  return (article?.textContent || document.body?.innerText || '').replace(/\s+/g, ' ').trim();
+  const source = pageSourceElement();
+  return source ? readableText(source) : '';
 }
 
 export function pageSourceElement(): Element | null {
   return document.querySelector('article, [role="main"], main') || document.body;
+}
+
+/**
+ * Split each visible prose block independently. This protects a source-unit
+ * boundary in minified article HTML and keeps every spoken sentence mappable.
+ */
+export function pageSentences(): Sentence[] {
+  const source = pageSourceElement();
+  if (!source) return [];
+  return readableSourceUnits(source)
+    .flatMap(({ text }) => splitSentences(text))
+    .map(({ text }, id) => ({ id, text }));
 }
 
 export function speakSentence(text: string, rate = 1, speech: SpeechSynthesis = window.speechSynthesis): SpeechSynthesisUtterance {
