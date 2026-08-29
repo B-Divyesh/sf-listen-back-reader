@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
+const productionEnvironment = { ...process.env, NODE_ENV: 'production' };
+
 describe('static deployment response policy', () => {
   it('maps every declared public claim to exactly one regression test', () => {
     const claims = JSON.parse(readFileSync('.factory/claims.json', 'utf8')) as Array<{ id: string; test: string }>;
@@ -62,18 +64,18 @@ describe('static deployment response policy', () => {
 
   it('build:site alone produces the complete deployable site with its extension ZIP', () => {
     rmSync('dist/site', { recursive: true, force: true });
-    execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe' });
+    execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe', env: productionEnvironment });
     expect(existsSync('dist/site/downloads/listen-back-reader.zip')).toBe(true);
     expect(readFileSync('dist/site/downloads/listen-back-reader.zip').byteLength).toBeGreaterThan(1_000);
   }, 30_000);
 
   it('@claim:source-marker follows exact wrapped sentence ranges in the packaged extension', () => {
-    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe' });
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe', env: productionEnvironment });
     execFileSync('node', ['scripts/verify-extension.mjs', '--claim', 'source-marker'], { stdio: 'pipe' });
   }, 30_000);
 
   it('@claim:active-page-only packages explicit active-tab injection with no standing site access', async () => {
-    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe' });
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe', env: productionEnvironment });
     const manifest = JSON.parse(readFileSync('.output/chrome-mv3/manifest.json', 'utf8'));
     expect(manifest.permissions).toEqual(['activeTab', 'scripting']);
     expect(manifest).not.toHaveProperty('content_scripts');
@@ -110,7 +112,7 @@ describe('static deployment response policy', () => {
   }, 30_000);
 
   it('@claim:installable-package builds the linked download as a valid MV3 extension archive', () => {
-    execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe' });
+    execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe', env: productionEnvironment });
     const manifest = JSON.parse(execFileSync('unzip', ['-p', 'dist/site/downloads/listen-back-reader.zip', 'manifest.json'], { encoding: 'utf8' }));
     expect(manifest).toMatchObject({ manifest_version: 3, name: 'Listen Back Reader' });
     expect(manifest.permissions).toEqual(['activeTab', 'scripting']);
