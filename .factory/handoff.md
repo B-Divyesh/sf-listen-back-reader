@@ -65,5 +65,15 @@ site demo remains available at `/demo?demo=1`, including 390px mobile.
 
 ## Deployment and known gaps
 
-Deployment/live identity verification will be appended after the work-order
-static deployment completes. There are no known product gaps.
+Deployed to <https://listen-back-reader.sociobot.in> through the configured
+Azure Static Web Apps production workflow on 2026-08-29 UTC. The post-deploy
+identity check passed: HTTP 200, frame policy and ZIP response headers valid,
+downloaded archive integrity valid, and SHA-256
+`b1b95c19f154d7f105e7478e609efcf9ae54e609a9e0b9e9394af5e01f8961b4`
+matches the local release archive. `VERIFY_BASE_URL=... npm run test:site`
+passed at 1440px and 390px. `verify-url.sh` against the live URL reported no
+console errors and valid title, language, h1, main, image alternatives, and
+button labels. Finally, the extension suite passed using the ZIP downloaded
+from the live site and extracted to a clean temporary directory.
+
+There are no known product gaps.
