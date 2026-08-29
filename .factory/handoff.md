@@ -1,4 +1,19 @@
-# Listen Back Reader — polish round 4 handoff
+# Listen Back Reader — independent verification 10 handoff
+
+## Current verification status
+
+**PASS** — candidate `10d36bd371e4a5f6f6af71e7b9657f138e1a5309` is accepted.
+Fresh independent verification found no release-blocking defects. The deployed
+site matches the candidate's fresh production HTML and extension ZIP
+byte-for-byte. Every claim test, full test, type/lint/build/package check,
+desktop/mobile accessibility check, privacy/network/header check, and live
+artifact comparison passed. See `.factory/verification-10.md` for exact
+commands and evidence.
+
+Known gaps: none. Desktop Chrome/Chromium-only installation is a deliberate,
+plainly disclosed product limit.
+
+# Prior builder handoff — polish round 4
 
 ## Status
 
