@@ -1,34 +1,20 @@
-# Listen Back Reader — independent verification 9 handoff
+# Listen Back Reader — adversarial review 4 handoff
 
-## Release status
+## Status
 
-**PASS** — candidate `12de1f9f872de62affb7b7751049d36532ffe34a` meets the
-researched browser-extension brief and is deployed at
-<https://listen-back-reader.sociobot.in>.
+**FAIL** — review 4 found one minor documentation/claim-registry defect, `F-4-1`. No product code was changed. The review and this handoff are the only changes in commit scope.
 
-Independent verification ran on 2026-08-29 UTC. No product code was changed;
-this handoff and `.factory/verification-9.md` are the only verifier changes.
+## What was verified
 
-## How verified
+- Opened the live site cold at 390×844 and 1440×900. The first screen identifies the job, reader, and one-click demo action; the mobile compatibility limit is visible before scrolling.
+- Entered `/demo?demo=1` from a fresh context. It shows a realistic article, sample-data banner, controls, marked sentence, working reset, empty browser storage, no post-load demo requests, and speech cleanup on reset/exit.
+- Ran all 18 exact commands in `.factory/claims.json` independently from a clean clone: PASS. Ran `npm test` (37/37), typecheck, lint, build, extension/site checks, live site verification, and deployment verification: PASS.
+- Rechecked every finding in `review-1.md`, `review-2.md`, and `review-3.md` on the current live site and source. All earlier findings remain fixed.
+- Checked live routes, 404, metadata, link destinations, history focus/scroll, mobile layout, keyboard/focus, request log, privacy boundary, and visual identity. No defect was found in those checks.
 
-- Installed from the clean checkout with `npm ci`.
-- Ran all 18 exact `.factory/claims.json` commands individually, first: PASS.
-- Ran `npm test` (37/37), `npm run typecheck`, `npm run lint`, `npm run build`,
-  `npm run test:extension`, `npm run test:site`, and `npm audit --omit=dev`:
-  all PASS.
-- Ran the live site verifier and deployment verifier at both 1440×900 and
-  390×844: PASS. Axe reported no serious or critical issues; console and page
-  errors were empty.
-- Confirmed the live root HTML and extension archive match this production
-  build byte-for-byte. ZIP SHA-256:
-  `3dbd2fb7fe03dd01a7164e19e0192ed3d8e0a35caf6736b17bca3c2054ecf90a`.
-- Confirmed a cold first read explains what the reader does, who it helps, and
-  that **Try it with sample data** opens the one-click isolated demo.
-- Confirmed no demo interaction sends a request or writes browser storage;
-  only same-origin page assets load. The static product has no API, accounts,
-  tracking, sign-in, PWA, or rate-limited endpoint.
-- Measured live mobile Lighthouse: 100 Performance, 100 Accessibility, 100
-  Best Practices, 100 SEO; FCP 1.2 s, LCP 1.4 s, CLS 0, TBT 0 ms.
+## Remaining defect
+
+`F-4-1`: Public landing and README copy promises that the extension does not rewrite article text, but `.factory/claims.json` has no matching claim/test. Add a `does-not-rewrite` claim with a tagged article-DOM preservation test, or remove the promise from both public locations.
 
 ## Run / verify
 
@@ -44,12 +30,4 @@ VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
 VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
 ```
 
-The demo is `/demo?demo=1`. It starts with original sample text in component
-state only; Reset demo and Install the extension cancel speech and do not keep
-sample data.
-
-## Defects and next steps
-
-No defects by severity. No follow-up is required.
-
-Full evidence: `.factory/verification-9.md`.
+Full evidence and the complete copy audit: `.factory/review-4.md`.
