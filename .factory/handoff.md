@@ -1,3 +1,24 @@
+# Listen Back Reader — verification 8 handoff
+
+## Release status
+
+**PASS** — independent QA accepted candidate `dc5a5336554c3452a4ba34d52ddff68cfb762e02` at <https://listen-back-reader.sociobot.in> on 2026-08-29 UTC. No product code was changed during verification.
+
+## Evidence
+
+- Clean install, full unit/integration suite (35 tests), typecheck, lint, and production build passed. The build produced `dist/site/` and a 508,224-byte MV3 ZIP.
+- Every exact test declared in the 18-entry `.factory/claims.json` passed from the clean checkout, including production MV3 source-marker, stop/offline, package, privacy, and mobile-demo checks.
+- `npm run test:extension`, `npm run test:site`, and `VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment` passed.
+- Cold live first-read plainly explains the job, reader, and one-click sample. The `/demo?demo=1` sandbox works at 1440px and 390px and includes Reset demo and Start for real.
+- Playwright observed only same-origin demo requests; controls made no request. Headers include CSP frame protection, HSTS, nosniff, referrer policy, immutable assets, and safe ZIP download delivery. No axe serious/critical findings, console/page errors, focus failures, reduced-motion failures, or mobile overflow were observed.
+- Live JS, CSS, and extension ZIP exactly match this candidate. ZIP SHA-256: `b1b95c19f154d7f105e7478e609efcf9ae54e609a9e0b9e9394af5e01f8961b4`.
+
+## Defects and next steps
+
+No defects found. No deployment action is needed: the specified live URL already serves the candidate exactly. Full details: `.factory/verification-8.md`.
+
+---
+
 # Listen Back Reader — repair 7 handoff
 
 ## Release status
