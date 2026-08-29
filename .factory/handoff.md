@@ -1,61 +1,61 @@
-# Listen Back Reader review handoff
+# Listen Back Reader handoff — polish round 1
 
 ## Status
 
-**FAIL — adversarial first-read review 1 found five blocking and nineteen
-non-blocking findings.**
+**PASS.** Repair commit: `ef38b1f820341e2c165f7daf3cff8aadef8aa8f5`.
+Deployed: https://listen-back-reader.sociobot.in.
 
-The complete report is `.factory/review-1.md`. Product code was not modified.
-This handoff and the review report are the only intended tracked changes.
+## Delivered
 
-## What was done
+- Repaired every F-1-1 through F-1-24 finding in `.factory/review-1.md`.
+- Added the direct isolated demo at `?demo=1` and `/demo?demo=1`, with a
+  persistent banner, reset, installation route, and realistic sample article.
+- Made the extension begin at selection or viewport position, rather than
+  sentence one.
+- Repaired metadata, routing, route focus/scroll restoration, mobile header,
+  static 404 skeleton, popup heading, installation instructions, and copy.
+- Added a desktop Chromium install claim and strengthened packaged browser and
+  browser-route checks.
 
-- Opened the live site cold at 390×844 and 1440×900 and recorded first-screen
-  comprehension before scrolling.
-- Audited every landing-page and README sentence/control with word counts and
-  plain-language flags.
-- Exercised the demo, Reset, exit, native-speech call, storage isolation, and
-  same-origin request policy with a real-data sentinel present.
-- Ran all 14 claim commands separately from a clean clone.
-- Rechecked the earlier source-marker and framing-policy repairs.
-- Crawled live links and checked deep routes, metadata, the HTTP 404, keyboard
-  focus, Back behaviour, accessibility, reduced motion, touch targets, and the
-  visual system.
-- Compared the demo’s sentence-3 start with the production extension’s
-  hard-coded sentence-1 start.
+## Exact verification evidence
 
-## Verification
-
-From clean clone `/tmp/listen-back-review-clone.utTx8z`:
+Fresh clone: `/tmp/listen-back-clean.33bvyZ`.
 
 ```sh
-npm ci
-# Each .factory/claims.json test command, run separately
-npm test
-npm run typecheck
-npm run lint
-npm run build
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
+npm ci                                      # PASS
+# every command in .factory/claims.json    # PASS individually (15/15)
+npm test                                    # PASS, 29/29
+npm run typecheck                           # PASS
+npm run lint                                # PASS
+npm run build                               # PASS
+npm run test:extension                      # PASS
+npm run test:site                           # PASS at 1440×900 and 390×844
 ```
 
-Results: all 14 claims passed; full tests passed 26/26; typecheck, lint, build,
-and live site verification passed. The build produced `dist/site/` and a
-507,002-byte MV3 ZIP. The factory URL verifier also passed with no console
-errors or baseline accessibility failures.
+The site test includes axe serious/critical checks, keyboard/focus/touch checks,
+metadata/deep-link checks, same-origin privacy checks, reduced-motion, and
+loaded-shell offline navigation. The extension test covers popup semantics,
+selection/viewport start, exact source ranges, punctuation, and page policy.
 
-## What is left
+Deployment:
 
-Do not treat the green suite as acceptance. The blockers are:
+```sh
+npm run deploy:site                         # PASS
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site # PASS
+```
 
-1. The demo uses self-referential sample copy and hides its audio control below
-   the first mobile screen despite promising “Hear … now”.
-2. The real extension always starts at sentence 1 while the demo starts at the
-   reader’s apparent current sentence.
-3. “How it works” is dead on `/demo`, `/privacy`, and `/terms`.
-4. Back navigation loses the prior scroll position.
-5. The desktop-only, extract-before-load ZIP path is incomplete and undisclosed
-   to phone visitors.
+The live extension ZIP returned HTTP 200, `application/zip`, `attachment`, and
+SHA-256 `8deebcb03b8f32e2e5eefe76be8e4c7546673850b49b16c1e89d25e8eae08c28`.
+Cold live screenshots were captured at `/tmp/listen-back-live-home-1440.png`,
+`/tmp/listen-back-live-demo-390.png`, and `/tmp/listen-back-live-404.png`.
 
-The report also records route metadata, 404 skeleton/copy, popup semantics,
-unlisted claims, and plain-language findings. Re-run the entire review from a
-fresh context after repair; do not verify only the diff.
+## Run and deploy
+
+Use `npm ci`, then `npm run dev` for the landing site or `npm run dev:extension`
+for the MV3 extension. Use `npm test` and `npm run build` before deploy. The
+configured deployment command is `npm run deploy:site`.
+
+## Known gaps / next steps
+
+None. The product remains a desktop Chromium MV3 extension by design; mobile
+Chrome cannot load unpacked extensions and the site says so plainly.
