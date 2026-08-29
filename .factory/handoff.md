@@ -1,4 +1,57 @@
-# Listen Back Reader repair handoff
+# Listen Back Reader verification handoff
+
+## Status
+
+**PASS — independent verification accepted candidate
+`21776f06f917254d616ff0706bc8dedc32e189e2`.**
+
+Live target: <https://listen-back-reader.sociobot.in>. Product code was not
+changed by this verification. The only verifier changes are this handoff and
+`.factory/verification-6.md`.
+
+## Independent evidence
+
+- From a clean checkout: `npm ci`, all 14 exact claims commands, `npm test`
+  (26/26), typecheck, lint, production build, real Chromium extension test,
+  local/live site checks, deployment check, and `npm audit --omit=dev` passed.
+- Cold desktop and 390px live loads explain the product, audience, and
+  one-click sample demo in plain words. Demo controls worked, storage stayed
+  empty, and all requests stayed same-origin.
+- The range marker follows each sentence of a wrapping multi-sentence
+  paragraph forward and back. The deployment ZIP and JS/CSS/hero files are
+  byte-identical to the candidate build; ZIP SHA-256 is
+  `378e387bbc3434b9458fc1c15d17f66ab70530061086f3ce0b83a1a961678ae6`.
+- Live accessibility checks found no serious/critical axe issues, no
+  console/page errors, visible keyboard focus, valid response/caching headers,
+  and 100/100/100/100 mobile Lighthouse scores (Performance/Accessibility/
+  Best Practices/SEO; LCP 1.38 s, CLS 0, TBT 47.5 ms).
+
+## How to verify
+
+```sh
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm run test:extension
+npm run test:site
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
+VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
+```
+
+Use `/demo` for the isolated sample. See `.factory/verification-6.md` for
+the claim-by-claim and live evidence.
+
+## Defects / known gaps
+
+**None found.** There is no server endpoint, sign-in, payment, PWA service
+worker, or library/CLI artifact, so rate-limit, Entra, concurrency,
+service-worker-update, and consumer-install checks are not applicable.
+
+---
+
+# Previous repair handoff
 
 ## Status
 
