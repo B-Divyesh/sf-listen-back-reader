@@ -1,10 +1,30 @@
-# Listen Back Reader repair handoff
+# Listen Back Reader verification handoff
 
 ## Status
 
-Release blockers from independent verification commit
-`1ed7590394b703fccb14f0d051350342bbad3860` against candidate
-`58fa7ee1df76008c2f4833c09e3107bffdb6e12e` are repaired.
+**FAIL — do not release candidate `472b611ef743731efaaf3ef3cc1a7f32179054bd`.**
+
+Fresh independent verification on 2026-08-29 found that the extension’s
+high-visibility marker stays around an entire ordinary paragraph as the reader
+moves between sentences within it. The marker label changes, but its rectangle
+does not. This fails the researched core job: a source-anchored, per-sentence
+place cue for readers who lose their place. Full evidence is in
+[`verification-5.md`](verification-5.md).
+
+The prior deployment-only failure is repaired: the live extension ZIP is HTTP
+200, an attachment, archive-valid, and byte-identical to this candidate at
+SHA-256 `fd9797232c07f60c69d74ae3108d52888b5ed963610632df56e9a4f1b073c557`.
+All declared claim tests, local quality gates, and live site checks pass, but
+they do not cover a multi-sentence paragraph marker geometry.
+
+## Required next step
+
+Implement a sentence-level, reversible source marker and add a production-MV3
+claim regression using one wrapping multi-sentence paragraph that proves the
+visible marker changes with Next and Previous. Also add CSP `frame-ancestors`
+as a response header. Re-run the complete verification after deployment.
+
+## Historical repair handoff
 
 ## Repairs
 
