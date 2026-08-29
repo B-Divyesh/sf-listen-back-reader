@@ -38,6 +38,9 @@ async function verifyViewport(width, height) {
     }
     if (await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) throw new Error(`${route} overflows at ${width}px.`);
     if (await page.locator('img:not([alt])').count()) throw new Error(`${route} has an image without alt text.`);
+    if (!await page.getByRole('link', { name: 'Built by Param Factory (external)' }).isVisible()) {
+      throw new Error(`${route} does not identify the Param Factory link as external.`);
+    }
     await page.addScriptTag({ path: axePath });
     const violations = await page.evaluate(async () => (await globalThis.axe.run()).violations
       .filter((violation) => ['serious', 'critical'].includes(violation.impact))
@@ -46,8 +49,40 @@ async function verifyViewport(width, height) {
   }
   checkingExpected404 = false;
 
+  await page.addInitScript(() => {
+    let cancellations = 0;
+    class DemoUtterance {
+      rate = 1;
+      onend = null;
+      onerror = null;
+      constructor(text) { this.text = text; }
+    }
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: DemoUtterance });
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: { cancel: () => { cancellations += 1; }, speak: () => undefined },
+    });
+    window.__listenBackDemoCancellations = () => cancellations;
+  });
   await page.goto(`${baseUrl}/demo?demo=1`);
-  if (!await page.getByRole('button', { name: 'Read highlighted sentence' }).isVisible()) throw new Error('Demo does not expose the read control immediately.');
+  const readControl = page.getByRole('button', { name: 'Read highlighted sentence' });
+  if (!await readControl.isVisible()) throw new Error('Demo does not expose the read control immediately.');
+  const activeSentence = page.locator('[aria-current="true"]');
+  if (!await activeSentence.isVisible()) throw new Error('Demo does not expose the marked sentence immediately.');
+  if (width <= 390) {
+    const activeBox = await activeSentence.boundingBox();
+    if (!activeBox || activeBox.y < 0 || activeBox.y + activeBox.height > height) throw new Error('Demo marked sentence is outside the first mobile viewport.');
+  }
+  await readControl.click();
+  const cancellationsBeforeReset = await page.evaluate(() => window.__listenBackDemoCancellations());
+  await page.getByRole('button', { name: 'Reset demo' }).click();
+  await page.waitForFunction(() => document.querySelector('.counter')?.textContent?.includes('Sentence 1 / 5'));
+  if (await page.evaluate(() => window.__listenBackDemoCancellations()) <= cancellationsBeforeReset) throw new Error('Demo reset did not cancel speech.');
+  await page.getByRole('button', { name: 'Read highlighted sentence' }).click();
+  const cancellationsBeforeInstall = await page.evaluate(() => window.__listenBackDemoCancellations());
+  await page.getByRole('button', { name: 'Install the extension' }).click();
+  await page.waitForFunction(() => document.activeElement?.id === 'install-heading');
+  if (await page.evaluate(() => window.__listenBackDemoCancellations()) <= cancellationsBeforeInstall) throw new Error('Demo exit did not cancel speech.');
   await page.getByRole('link', { name: 'Privacy' }).first().click();
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
   await page.goBack();

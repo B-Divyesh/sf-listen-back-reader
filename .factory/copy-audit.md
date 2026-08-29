@@ -1,6 +1,6 @@
 # Copy audit
 
-Audited 2026-08-29 after polish round 2. Counts treat hyphenated terms,
+Audited 2026-08-29 after polish round 3. Counts treat hyphenated terms,
 shortcuts, URLs, and paths as one word. No line exceeds 22 words. No line uses
 a banned marketing word, unexplained metaphor, or product lore.
 
@@ -48,6 +48,7 @@ a banned marketing word, unexplained metaphor, or product lore.
 | Open chrome://extensions and enable Developer mode. | 6 | — |
 | Choose Load unpacked and select the extracted folder. | 8 | — |
 | Replay one sentence without losing your place. | 7 | — |
+| Built by Param Factory (external) | 5 | — |
 
 The five sample-article sentences are 19, 17, 14, 16, and 12 words. They are
 original fixture copy and each remains below the 22-word cap.
@@ -58,7 +59,7 @@ original fixture copy and each remains below the 22-word cap.
 | --- | ---: | --- |
 | Demo — sample data, nothing is saved. | 6 | — |
 | Reset demo | 2 | — |
-| Start for real | 3 | — |
+| Install the extension | 3 | — |
 | Read one highlighted sentence. | 4 | — |
 | Try browser speech on a city library report. | 8 | — |
 | The sample stays separate from your data. | 8 | — |
@@ -87,6 +88,8 @@ original fixture copy and each remains below the 22-word cap.
 | Deploy the site with the repository's deploy script. | 9 | — |
 | Some voices may need a network connection. | 7 | — |
 | The extension has no Listen Back server, tracking, accounts, or analytics. | 11 | — |
+| Use Reset demo to stop any sample speech and start again. | 11 | — |
+| Choose Install the extension to leave the sample and open the installation steps. | 13 | — |
 
 ## Terminology
 

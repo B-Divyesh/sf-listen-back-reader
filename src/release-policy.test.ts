@@ -35,6 +35,7 @@ describe('static deployment response policy', () => {
     expect(notFound).toContain('<html lang="en">');
     expect(notFound).toContain('<main id="main">');
     expect(notFound.match(/<h1[ >]/g)).toHaveLength(1);
+    expect(notFound).toContain('Built by Param Factory (external)');
   });
 
   it('preloads a responsive mobile hero within the image budget', () => {
@@ -169,5 +170,10 @@ describe('static deployment response policy', () => {
     expect(readme).toContain('Load unpacked');
     expect(landing).toContain('Desktop Chrome or Chromium only');
     expect(readFileSync('wxt.config.ts', 'utf8')).toContain("permissions: ['activeTab', 'scripting']");
+  });
+
+  it('labels every factory link as an external site', () => {
+    expect(readFileSync('src/site.tsx', 'utf8')).toContain('Built by Param Factory (external)');
+    expect(readFileSync('public/404.html', 'utf8')).toContain('Built by Param Factory (external)');
   });
 });

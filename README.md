@@ -24,8 +24,9 @@ voice selected by your browser or operating system.
 
 Open `/demo?demo=1` on the deployed site, or `http://localhost:5173/demo?demo=1`
 while developing. The demo keeps its sample separate and does not read or
-change your extension data. Use Reset demo to start the sample again. Choose
-Start for real to leave the sample and open the installation steps.
+change your extension data. Use Reset demo to stop any sample speech and start
+again. Choose Install the extension to leave the sample and open the
+installation steps.
 
 ## Install the extension
 

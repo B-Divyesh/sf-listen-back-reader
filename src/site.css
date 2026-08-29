@@ -183,6 +183,7 @@ a:focus-visible { outline: 3px solid #ad6400; outline-offset: 4px; }
   .demo-banner button { margin-right: 8px; margin-left: 0; }
   .demo-page,
   .legal { padding: 56px 18px 75px; }
+  .demo-page { padding-top: 48px; }
   .counter { font-size: 12px; }
 }
 
