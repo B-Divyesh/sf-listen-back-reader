@@ -1,8 +1,11 @@
 # Copy audit
 
-Audited 2026-08-29 after polish round 3. Counts treat hyphenated terms,
+Audited 2026-08-29 after polish round 4. Counts treat hyphenated terms,
 shortcuts, URLs, and paths as one word. No line exceeds 22 words. No line uses
 a banned marketing word, unexplained metaphor, or product lore.
+
+The public no-rewrite wording is registered as `does-not-rewrite` and covered
+by `npm test -- -t @claim:does-not-rewrite`.
 
 ## Landing page and shared interface
 
@@ -101,3 +104,9 @@ original fixture copy and each remains below the 22-word cap.
 | sample environment | demo |
 | visible position cue | marker |
 | speech provider | browser voice |
+
+## Catalog description
+
+| Copy | Words | Flag |
+| --- | ---: | --- |
+| Replay web sentences one at a time to keep your place. | 11 | — |

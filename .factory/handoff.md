@@ -1,22 +1,56 @@
-# Listen Back Reader — adversarial review 4 handoff
+# Listen Back Reader — polish round 4 handoff
 
 ## Status
 
-**FAIL** — review 4 found one minor documentation/claim-registry defect, `F-4-1`. No product code was changed. The review and this handoff are the only changes in commit scope.
+**PASS.** Repair commit `457b1bb` resolves review-4 finding `F-4-1` and
+preserves all earlier repairs. It was pushed to `main` and deployed through the
+configured Azure Static Web Apps work order on 2026-08-29 UTC. No product gaps
+remain.
 
-## What was verified
+`.factory/brief.json` is absent from the supplied repository. This pass used
+the product design record, all four review reports, all three earlier polish
+records, and the live product as the available scope evidence.
 
-- Opened the live site cold at 390×844 and 1440×900. The first screen identifies the job, reader, and one-click demo action; the mobile compatibility limit is visible before scrolling.
-- Entered `/demo?demo=1` from a fresh context. It shows a realistic article, sample-data banner, controls, marked sentence, working reset, empty browser storage, no post-load demo requests, and speech cleanup on reset/exit.
-- Ran all 18 exact commands in `.factory/claims.json` independently from a clean clone: PASS. Ran `npm test` (37/37), typecheck, lint, build, extension/site checks, live site verification, and deployment verification: PASS.
-- Rechecked every finding in `review-1.md`, `review-2.md`, and `review-3.md` on the current live site and source. All earlier findings remain fixed.
-- Checked live routes, 404, metadata, link destinations, history focus/scroll, mobile layout, keyboard/focus, request log, privacy boundary, and visual identity. No defect was found in those checks.
+## What changed
 
-## Remaining defect
+- Added registered claim `does-not-rewrite`. Its tagged test activates the
+  actual content script on a realistic article, starts reading, advances, and
+  stops. It asserts that source text and exact child markup are unchanged, and
+  confirms the marker is outside the article.
+- Updated the catalog line to the verb-first sentence “Replay web sentences
+  one at a time to keep your place.”
+- Recorded the complete finding map in `.factory/polish-4.md` and fresh
+  local/live evidence in `.factory/evidence/polish-4/live/`.
 
-`F-4-1`: Public landing and README copy promises that the extension does not rewrite article text, but `.factory/claims.json` has no matching claim/test. Add a `does-not-rewrite` claim with a tagged article-DOM preservation test, or remove the promise from both public locations.
+## Verification
 
-## Run / verify
+Fresh clone: `/tmp/listen-back-reader-polish4-clean.rG4kQt` at `457b1bb`.
+
+- `npm ci`: pass; zero production vulnerabilities.
+- Every one of the 19 exact commands in `.factory/claims.json`: pass
+  independently, including `@claim:does-not-rewrite`.
+- `npm test`: 38/38 pass.
+- `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run test:extension`, `npm run test:site`, and `npm audit --omit=dev`:
+  pass.
+- Built site: JS 65.21 KB gzip; CSS 2.59 KB gzip; mobile hero 50.70 KB.
+- `npm run deploy:site`: pass. The public extension archive is HTTP 200,
+  valid, and byte-identical to the build at SHA-256
+  `3dbd2fb7fe03dd01a7164e19e0192ed3d8e0a35caf6736b17bca3c2054ecf90a`.
+- Cold live check: `VERIFY_BASE_URL=https://listen-back-reader.sociobot.in
+  npm run test:site` passed at 1440×900 and 390×844. It covers routes,
+  metadata, real HTTP 404, Back/Forward focus and scroll restoration, demo
+  isolation, mobile layout, keyboard/touch, privacy/offline behavior, reduced
+  motion, console errors, and serious/critical axe results.
+- `/opt/fleet/lib/verify-url.sh` passed on live `/` and `/demo?demo=1` with no
+  console errors, one H1, `lang="en"`, main, labeled controls, and image alt
+  text. Evidence: `evidence/polish-4/live/root/verify.json` and
+  `evidence/polish-4/live/demo/verify.json`.
+- Live mobile Lighthouse: Performance 100, Accessibility 100, Best Practices
+  100, SEO 100; FCP 1.2 s, LCP 1.4 s, CLS 0, TBT 0 ms. Evidence:
+  `evidence/polish-4/live/lighthouse-mobile.json`.
+
+## Run and verify
 
 ```sh
 npm ci
@@ -27,7 +61,10 @@ npm run build
 npm run test:extension
 npm run test:site
 VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:site
-VERIFY_BASE_URL=https://listen-back-reader.sociobot.in npm run test:deployment
+npm run deploy:site
 ```
 
-Full evidence and the complete copy audit: `.factory/review-4.md`.
+## Known gaps and next steps
+
+None. The extension remains desktop Chrome/Chromium-only by design; the
+first-screen disclosure and mobile demo state that limitation plainly.
