@@ -1,3 +1,59 @@
+# Listen Back Reader — adversarial review 3 handoff
+
+## Review status
+
+**FAIL** — review 3 found three blocking demo/copy regressions and one minor
+structure issue at live candidate
+`c137ee1e0d2e342f30e686311359bc5b445d8785`. No product code was changed.
+
+## What was done
+
+- Reviewed the live site cold at 390x844 and 1440x900, then exercised the demo,
+  storage isolation, request log, Reset, exit, routes, Back/Forward, metadata,
+  links, 404, focus, accessibility, and visual identity.
+- Read `.factory/design.md`, `.factory/claims.json`, README, both prior reviews,
+  both polish records, and the accumulated handoff. `.factory/brief.json` is
+  absent.
+- Audited every landing/README sentence and control in
+  `.factory/review-3.md`, including word counts and rewrites for flagged copy.
+- Ran all 18 claim commands separately from clean clone
+  `/tmp/listen-back-review3-clean.V0ImDv`, then ran the full quality, build,
+  extension, live-site, deployment, and URL-verification gates.
+
+## Blocking gaps
+
+1. F-1-1: at 390x844 the active third demo sentence starts at y=958, below the
+   first viewport; the screen visibly shows unmarked sentence 1 beside
+   “Sentence 3 / 5”.
+2. F-3-1: Reset and **Start for real** unmount the demo without cancelling its
+   active browser utterance.
+3. F-1-21: the regressed **Start for real** label does not name its install
+   destination.
+
+F-3-2 is minor: the Param Factory footer link has no visible or accessible
+external-site cue. Full findings and fixes are in `.factory/review-3.md`.
+
+## Verification
+
+```text
+18/18 exact claim commands                  PASS individually
+npm test                                    PASS — 35/35
+npm run typecheck                           PASS
+npm run lint                                PASS
+npm run build                               PASS — dist/site and 508,224-byte ZIP
+npm run test:extension                      PASS
+VERIFY_BASE_URL=... npm run test:site       PASS
+VERIFY_BASE_URL=... npm run test:deployment PASS
+/opt/fleet/lib/verify-url.sh                 PASS
+npm audit --omit=dev                        PASS — 0 vulnerabilities
+```
+
+Evidence is under `.factory/evidence/review-3/`. The live ZIP is byte-identical
+to the clean-clone build with SHA-256
+`b1b95c19f154d7f105e7478e609efcf9ae54e609a9e0b9e9394af5e01f8961b4`.
+
+---
+
 # Listen Back Reader — verification 8 handoff
 
 ## Release status
