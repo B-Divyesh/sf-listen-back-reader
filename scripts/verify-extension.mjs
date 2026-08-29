@@ -17,9 +17,9 @@ const server = createServer((request, response) => {
   const attribute = protection === 'data-no-copy' ? protection : '';
   const article = request.url === '/boundaries'
     ? 'Dr. Smith reviewed the report at 3 p.m. Then she approved it. The U.S. team met. Next item. A decimal is 3.14. Done.'
-    : 'First source sentence. Second source sentence.';
+    : 'First sentence is brief. Second sentence is the current reading target. Third sentence closes the paragraph.';
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}</head><body><main ${attribute}><p>${article}</p></main></body></html>`);
+  response.end(`<!doctype html><html lang="en"><head><title>Reader fixture</title>${meta}<style>p{width:260px;font:20px/1.5 monospace}</style></head><body><main ${attribute}><p>${article}</p></main></body></html>`);
 });
 
 await new Promise((resolveReady) => server.listen(0, '127.0.0.1', resolveReady));
@@ -89,9 +89,68 @@ try {
   await activate(normal);
   await normal.keyboard.press('Alt+R');
   await normal.locator('#listen-back-marker').waitFor();
-  const firstSentence = await normal.locator('#listen-back-marker').getAttribute('aria-label');
+  const markerSnapshot = async () => {
+    await normal.waitForTimeout(220);
+    return normal.locator('#listen-back-marker').evaluate((marker) => {
+      const label = marker.getAttribute('aria-label');
+      const sentence = label?.replace(/^Current sentence: /, '') ?? '';
+      const paragraph = document.querySelector('p');
+      const text = paragraph?.firstChild;
+      if (!(text instanceof Text)) throw new Error('The geometry fixture has no paragraph text node.');
+      const start = text.data.indexOf(sentence);
+      const expectedRange = document.createRange();
+      expectedRange.setStart(text, start);
+      expectedRange.setEnd(text, start + sentence.length);
+      const expectedFragments = [...expectedRange.getClientRects()].map((rect) => ({
+        left: rect.left - 7,
+        top: rect.top - 2,
+        right: rect.right + 2,
+        bottom: rect.bottom + 2,
+      }));
+      const expectedRectangle = [
+        Math.min(...expectedFragments.map(({ left }) => left)),
+        Math.min(...expectedFragments.map(({ top }) => top)),
+        Math.max(...expectedFragments.map(({ right }) => right)) - Math.min(...expectedFragments.map(({ left }) => left)),
+        Math.max(...expectedFragments.map(({ bottom }) => bottom)) - Math.min(...expectedFragments.map(({ top }) => top)),
+      ].map((value) => Math.round(value));
+      const rectangle = marker.getBoundingClientRect();
+      return {
+        label,
+        rectangle: [rectangle.x, rectangle.y, rectangle.width, rectangle.height].map((value) => Math.round(value)),
+        expectedRectangle,
+        visibleRanges: marker.querySelectorAll('[data-listen-back-range]').length,
+        expectedVisibleRanges: expectedFragments.length,
+      };
+    });
+  };
+  const firstMarker = await markerSnapshot();
   await normal.keyboard.press('Alt+ArrowRight');
-  await normal.waitForFunction((sentence) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== sentence, firstSentence);
+  await normal.waitForFunction((sentence) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== sentence, firstMarker.label);
+  const secondMarker = await markerSnapshot();
+  await normal.keyboard.press('Alt+ArrowRight');
+  await normal.waitForFunction((sentence) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== sentence, secondMarker.label);
+  const thirdMarker = await markerSnapshot();
+  await normal.keyboard.press('Alt+ArrowLeft');
+  await normal.waitForFunction((sentence) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== sentence, thirdMarker.label);
+  const returnedSecondMarker = await markerSnapshot();
+  await normal.keyboard.press('Alt+ArrowLeft');
+  await normal.waitForFunction((sentence) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== sentence, returnedSecondMarker.label);
+  const returnedFirstMarker = await markerSnapshot();
+
+  if ([firstMarker, secondMarker, thirdMarker].some(({ visibleRanges, expectedVisibleRanges }) => visibleRanges < 1 || visibleRanges !== expectedVisibleRanges)) {
+    throw new Error(`The marker does not expose visible sentence-range overlays: ${JSON.stringify([firstMarker, secondMarker, thirdMarker])}`);
+  }
+  if ([firstMarker, secondMarker, thirdMarker].some(({ rectangle, expectedRectangle }) => JSON.stringify(rectangle) !== JSON.stringify(expectedRectangle))) {
+    throw new Error(`The marker does not bound the browser's sentence range: ${JSON.stringify([firstMarker, secondMarker, thirdMarker])}`);
+  }
+  if (JSON.stringify(firstMarker.rectangle) === JSON.stringify(secondMarker.rectangle)
+      || JSON.stringify(secondMarker.rectangle) === JSON.stringify(thirdMarker.rectangle)) {
+    throw new Error(`The marker did not follow each sentence in one paragraph: ${JSON.stringify([firstMarker, secondMarker, thirdMarker])}`);
+  }
+  if (JSON.stringify(returnedSecondMarker.rectangle) !== JSON.stringify(secondMarker.rectangle)
+      || JSON.stringify(returnedFirstMarker.rectangle) !== JSON.stringify(firstMarker.rectangle)) {
+    throw new Error(`Previous did not return the marker to the prior sentence ranges: ${JSON.stringify({ firstMarker, secondMarker, returnedSecondMarker, returnedFirstMarker })}`);
+  }
 
   const extensionId = new URL(worker.url()).host;
   const popup = await context.newPage();
@@ -130,7 +189,7 @@ try {
 
   await verifyBlocked('/noarchive');
   await verifyBlocked('/no-copy');
-  console.log('Verified the production extension in Chromium: pages remain untouched until invocation, dense punctuation stays source-faithful, shortcuts advance, protected pages stay unread, and popup controls are at least 44px.');
+  console.log('Verified the production extension in Chromium: the marker follows exact wrapped sentence ranges forward and back, pages remain untouched until invocation, dense punctuation stays source-faithful, protected pages stay unread, and popup controls are at least 44px.');
 } finally {
   await context?.close();
   await new Promise((resolveClosed) => server.close(resolveClosed));

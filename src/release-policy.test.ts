@@ -27,6 +27,7 @@ describe('static deployment response policy', () => {
       expect.objectContaining({ route: '/downloads/*', headers: { 'Cache-Control': 'no-cache', 'Content-Disposition': 'attachment' } }),
     ]));
     expect(config.responseOverrides?.['404']).toEqual({ rewrite: '/404.html', statusCode: 404 });
+    expect(config.globalHeaders?.['Content-Security-Policy']).toContain("frame-ancestors 'none'");
 
     const notFound = readFileSync('public/404.html', 'utf8');
     expect(notFound).toContain('<html lang="en">');
@@ -50,10 +51,13 @@ describe('static deployment response policy', () => {
     expect(pkg.scripts['test:deployment']).toBe('node scripts/verify-deployment.mjs');
 
     const deployment = readFileSync('scripts/deploy-site.mjs', 'utf8');
+    const verification = readFileSync('scripts/verify-deployment.mjs', 'utf8');
     expect(deployment).toContain("const resourceGroup = 'sociobot'");
     expect(deployment).toContain("const appName = 'sf-listen-back-reader'");
     expect(deployment).toContain("'deploy', 'dist/site'");
     expect(deployment).toContain('SWA_CLI_DEPLOYMENT_TOKEN: deploymentToken');
+    expect(verification).toContain("frame-ancestors 'none'");
+    expect(verification).toContain('<title>Listen Back Reader — replay one sentence</title>');
   });
 
   it('build:site alone produces the complete deployable site with its extension ZIP', () => {
@@ -61,6 +65,11 @@ describe('static deployment response policy', () => {
     execFileSync('npm', ['run', 'build:site'], { stdio: 'pipe' });
     expect(existsSync('dist/site/downloads/listen-back-reader.zip')).toBe(true);
     expect(readFileSync('dist/site/downloads/listen-back-reader.zip').byteLength).toBeGreaterThan(1_000);
+  }, 30_000);
+
+  it('@claim:source-marker follows exact wrapped sentence ranges in the packaged extension', () => {
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe' });
+    execFileSync('node', ['scripts/verify-extension.mjs', '--claim', 'source-marker'], { stdio: 'pipe' });
   }, 30_000);
 
   it('@claim:active-page-only packages explicit active-tab injection with no standing site access', async () => {

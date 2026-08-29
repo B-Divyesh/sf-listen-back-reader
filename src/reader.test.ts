@@ -161,10 +161,10 @@ describe('content-script protected-page keyboard regression', () => {
     expect(speak).not.toHaveBeenCalled();
   });
 
-  it('@claim:source-marker marks the source element for the sentence it reads', async () => {
+  it('marks the exact source range for each sentence inside one paragraph', async () => {
     document.documentElement.removeAttribute('data-listen-back');
     document.head.innerHTML = '';
-    document.body.innerHTML = '<main><p>First source sentence.</p> <p>Second source sentence.</p></main>';
+    document.body.innerHTML = '<main><p>First sentence is brief. Second <em>sentence is the current</em> reading target. Third sentence closes the paragraph.</p></main>';
 
     let main: (() => void) | undefined;
     let receive: ((message: unknown) => unknown) | undefined;
@@ -173,6 +173,19 @@ describe('content-script protected-page keyboard regression', () => {
     vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} });
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     HTMLElement.prototype.scrollIntoView = vi.fn();
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value(this: Range) {
+        const geometry: Record<string, [number, number, number, number][]> = {
+          'First sentence is brief.': [[10, 20, 180, 24]],
+          'Second sentence is the current reading target.': [[10, 50, 210, 24], [10, 74, 90, 24]],
+          'Third sentence closes the paragraph.': [[100, 74, 160, 24], [10, 98, 130, 24]],
+        };
+        return (geometry[this.toString()] ?? []).map(([left, top, width, height]) => ({
+          left, top, width, height, right: left + width, bottom: top + height,
+        }));
+      },
+    });
     vi.stubGlobal('browser', {
       runtime: {
         onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
@@ -190,9 +203,31 @@ describe('content-script protected-page keyboard regression', () => {
     receive?.({ type: 'listen-back-control', action: 'start' });
 
     const marker = document.querySelector<HTMLElement>('#listen-back-marker');
-    expect(marker?.getAttribute('aria-label')).toBe('Current sentence: First source sentence.');
-    expect(marker?.style.borderLeft).toContain('8px');
-    expect(speak).toHaveBeenCalledOnce();
-    expect((speak.mock.calls[0]?.[0] as { text: string }).text).toBe('First source sentence.');
+    expect(marker?.getAttribute('aria-label')).toBe('Current sentence: First sentence is brief.');
+    expect(marker?.querySelectorAll('[data-listen-back-range]')).toHaveLength(1);
+    const firstGeometry = [marker?.style.left, marker?.style.top, marker?.style.width, marker?.style.height];
+
+    receive?.({ type: 'listen-back-control', action: 'next' });
+    expect(marker?.getAttribute('aria-label')).toBe('Current sentence: Second sentence is the current reading target.');
+    expect(marker?.querySelectorAll('[data-listen-back-range]')).toHaveLength(2);
+    const secondGeometry = [marker?.style.left, marker?.style.top, marker?.style.width, marker?.style.height];
+    expect(secondGeometry).not.toEqual(firstGeometry);
+
+    receive?.({ type: 'listen-back-control', action: 'next' });
+    expect(marker?.getAttribute('aria-label')).toBe('Current sentence: Third sentence closes the paragraph.');
+    expect(marker?.querySelectorAll('[data-listen-back-range]')).toHaveLength(2);
+    expect([marker?.style.left, marker?.style.top, marker?.style.width, marker?.style.height]).not.toEqual(secondGeometry);
+
+    receive?.({ type: 'listen-back-control', action: 'previous' });
+    expect([marker?.style.left, marker?.style.top, marker?.style.width, marker?.style.height]).toEqual(secondGeometry);
+    receive?.({ type: 'listen-back-control', action: 'previous' });
+    expect([marker?.style.left, marker?.style.top, marker?.style.width, marker?.style.height]).toEqual(firstGeometry);
+    expect(speak.mock.calls.map(([utterance]) => (utterance as { text: string }).text)).toEqual([
+      'First sentence is brief.',
+      'Second sentence is the current reading target.',
+      'Third sentence closes the paragraph.',
+      'Second sentence is the current reading target.',
+      'First sentence is brief.',
+    ]);
   });
 });

@@ -10,6 +10,17 @@ const archivePath = 'dist/site/downloads/listen-back-reader.zip';
 if (!baseUrl) throw new Error('VERIFY_BASE_URL is required (for example, https://listen-back-reader.sociobot.in).');
 if (statSync(archivePath).size < 1_000) throw new Error(`Local release archive is missing: ${archivePath}`);
 
+const siteResponse = await fetch(`${baseUrl}/`, { redirect: 'error', cache: 'no-store' });
+if (!siteResponse.ok) throw new Error(`${baseUrl}/ returned HTTP ${siteResponse.status}, expected HTTP 200.`);
+const policy = siteResponse.headers.get('content-security-policy') ?? '';
+if (!policy.includes("frame-ancestors 'none'")) {
+  throw new Error(`${baseUrl}/ is missing the frame-ancestors 'none' response policy.`);
+}
+const site = await siteResponse.text();
+if (!site.includes('<title>Listen Back Reader — replay one sentence</title>')) {
+  throw new Error(`${baseUrl}/ does not identify the Listen Back Reader release.`);
+}
+
 const url = `${baseUrl}/downloads/listen-back-reader.zip`;
 const response = await fetch(url, { redirect: 'error', cache: 'no-store' });
 if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}, expected HTTP 200.`);
@@ -39,4 +50,4 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`Verified live extension archive: HTTP 200, ZIP response headers, byte hash ${digest(local)}, and archive integrity.`);
+console.log(`Verified live identity and frame policy plus extension archive: HTTP 200, ZIP response headers, byte hash ${digest(local)}, and archive integrity.`);

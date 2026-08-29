@@ -45,6 +45,10 @@ export function pageText(): string {
   return (article?.textContent || document.body?.innerText || '').replace(/\s+/g, ' ').trim();
 }
 
+export function pageSourceElement(): Element | null {
+  return document.querySelector('article, [role="main"], main') || document.body;
+}
+
 export function speakSentence(text: string, rate = 1, speech: SpeechSynthesis = window.speechSynthesis): SpeechSynthesisUtterance {
   speech.cancel();
   const utterance = new SpeechSynthesisUtterance(text);

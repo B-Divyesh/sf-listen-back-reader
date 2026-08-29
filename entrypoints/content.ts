@@ -1,6 +1,7 @@
-import { clampIndex, nextIndex, pageText, previousIndex, splitSentences } from '../src/reader';
+import { clampIndex, nextIndex, pageSourceElement, pageText, previousIndex, splitSentences } from '../src/reader';
 import { copyRestrictedMessage, isCopyRestricted } from '../src/page-policy';
 import { readerShortcutCommand, runReaderShortcut, type ReaderCommand } from '../src/reader-shortcuts';
+import { locateSentenceSources } from '../src/source-range';
 
 export default defineContentScript({
   registration: 'runtime',
@@ -10,10 +11,13 @@ export default defineContentScript({
     document.documentElement.setAttribute('data-listen-back', 'ready');
     const copyRestricted = isCopyRestricted(document);
     const sentences = copyRestricted ? [] : splitSentences(pageText());
+    const sourceElement = pageSourceElement();
+    const sources = sourceElement ? locateSentenceSources(sentences.map(({ text }) => text), sourceElement) : [];
     let current = 0;
     let rate = 1;
     let marker: HTMLDivElement | undefined;
-    let activeElement: Element | undefined;
+    let observedElement: Element | undefined;
+    const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => mark()) : undefined;
 
     const ensureMarker = () => {
       if (marker) return marker;
@@ -23,34 +27,79 @@ export default defineContentScript({
       marker.setAttribute('aria-live', 'polite');
       marker.setAttribute('aria-label', 'Current sentence marker');
       marker.style.cssText = [
-        'position:absolute', 'z-index:2147483647', 'pointer-events:none', 'border-left:8px solid #c2410c',
-        'background:repeating-radial-gradient(circle at 3px 3px, rgba(194,65,12,.20) 0 1px, transparent 1.5px 7px)',
-        'outline:2px solid rgba(194,65,12,.7)', 'border-radius:5px', 'transition:opacity .18s ease, transform .18s ease',
+        'position:absolute', 'z-index:2147483647', 'pointer-events:none', 'overflow:visible',
+        `transition:${matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : 'top .18s ease, left .18s ease, width .18s ease, height .18s ease'}`,
       ].join(';');
       document.body.append(marker);
       return marker;
     };
 
-    const findElement = (text: string) => {
-      const nodes = [...document.querySelectorAll('p, li, blockquote, h1, h2, h3')];
-      return nodes.find((node) => node.textContent?.replace(/\s+/g, ' ').includes(text.slice(0, 36)));
-    };
-
     const mark = () => {
       const sentence = sentences[current];
       if (!sentence) return;
-      const el = findElement(sentence.text);
-      if (!el) return;
-      activeElement = el;
-      const rect = el.getBoundingClientRect();
+      const source = sources[current];
+      if (!source) {
+        resizeObserver?.disconnect();
+        observedElement = undefined;
+        marker?.remove();
+        marker = undefined;
+        return;
+      }
+      if (source.element !== observedElement) {
+        resizeObserver?.disconnect();
+        resizeObserver?.observe(source.element);
+        observedElement = source.element;
+      }
+      const clientRects = typeof source.range.getClientRects === 'function'
+        ? [...source.range.getClientRects()].filter(({ width, height }) => width > 0 && height > 0)
+        : [];
+      if (!clientRects.length) {
+        marker?.remove();
+        marker = undefined;
+        return;
+      }
+      const expanded = clientRects.map((rect) => ({
+        left: rect.left - 7,
+        top: rect.top - 2,
+        right: rect.right + 2,
+        bottom: rect.bottom + 2,
+      }));
+      const bounds = {
+        left: Math.min(...expanded.map(({ left }) => left)),
+        top: Math.min(...expanded.map(({ top }) => top)),
+        right: Math.max(...expanded.map(({ right }) => right)),
+        bottom: Math.max(...expanded.map(({ bottom }) => bottom)),
+      };
       const layer = ensureMarker();
       layer.setAttribute('aria-label', `Current sentence: ${sentence.text}`);
+      layer.replaceChildren(...expanded.map((rect) => {
+        const visibleRange = document.createElement('span');
+        visibleRange.dataset.listenBackRange = '';
+        visibleRange.setAttribute('aria-hidden', 'true');
+        Object.assign(visibleRange.style, {
+          position: 'absolute',
+          left: `${rect.left - bounds.left}px`,
+          top: `${rect.top - bounds.top}px`,
+          width: `${rect.right - rect.left}px`,
+          height: `${rect.bottom - rect.top}px`,
+          borderLeft: '7px solid #c2410c',
+          borderRadius: '4px',
+          background: 'repeating-radial-gradient(circle at 3px 3px, rgba(194,65,12,.20) 0 1px, transparent 1.5px 7px)',
+          outline: '2px solid rgba(194,65,12,.7)',
+          boxSizing: 'border-box',
+        });
+        return visibleRange;
+      }));
       Object.assign(layer.style, {
-        top: `${window.scrollY + rect.top - 4}px`, left: `${window.scrollX + rect.left - 9}px`,
-        width: `${rect.width + 18}px`, height: `${rect.height + 8}px`,
+        top: `${window.scrollY + bounds.top}px`,
+        left: `${window.scrollX + bounds.left}px`,
+        width: `${bounds.right - bounds.left}px`,
+        height: `${bounds.bottom - bounds.top}px`,
       });
-      el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+      layer.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     };
+
+    window.addEventListener('resize', mark, { passive: true });
 
     const stop = () => speechSynthesis.cancel();
     const speak = () => {
