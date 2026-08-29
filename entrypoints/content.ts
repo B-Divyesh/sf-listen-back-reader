@@ -123,17 +123,53 @@ export default defineContentScript({
 
     window.addEventListener('resize', mark, { passive: true });
 
-    const stop = () => speechSynthesis.cancel();
+    let speaking = false;
+    let speechError = '';
+    const state = () => ({
+      count: sentences.length,
+      current,
+      text: sentences[current]?.text || '',
+      rate,
+      speaking,
+      speechError,
+    });
+    const sendState = () => browser.runtime.sendMessage({ type: 'listen-back-state', ...state() }).catch(() => undefined);
+    const stop = () => {
+      speechSynthesis.cancel();
+      speaking = false;
+      marker?.setAttribute('data-listen-back-speaking', 'false');
+      sendState();
+    };
     const speak = () => {
       const sentence = sentences[current];
       if (!sentence) return;
-      stop(); mark();
+      speechSynthesis.cancel();
+      speechError = '';
+      mark();
       const utterance = new SpeechSynthesisUtterance(sentence.text);
       utterance.rate = rate;
-      utterance.onend = () => document.dispatchEvent(new CustomEvent('listen-back-ended'));
-      speechSynthesis.speak(utterance);
+      utterance.onend = () => {
+        speaking = false;
+        marker?.setAttribute('data-listen-back-speaking', 'false');
+        sendState();
+        document.dispatchEvent(new CustomEvent('listen-back-ended'));
+      };
+      utterance.onerror = () => {
+        speaking = false;
+        marker?.setAttribute('data-listen-back-speaking', 'false');
+        speechError = 'The browser voice could not read this sentence. Enable a browser voice, then try again.';
+        sendState();
+      };
+      speaking = true;
+      marker?.setAttribute('data-listen-back-speaking', 'true');
+      try {
+        speechSynthesis.speak(utterance);
+      } catch {
+        speaking = false;
+        marker?.setAttribute('data-listen-back-speaking', 'false');
+        speechError = 'The browser voice could not read this sentence. Enable a browser voice, then try again.';
+      }
     };
-    const sendState = () => browser.runtime.sendMessage({ type: 'listen-back-state', count: sentences.length, current, text: sentences[current]?.text || '', rate }).catch(() => undefined);
 
     const runCommand = (command: ReaderCommand, speakAfterMove = false) => {
       if (command === 'next_sentence') current = nextIndex(current, sentences.length);
@@ -152,14 +188,15 @@ export default defineContentScript({
       if (request.type === 'listen-back-control') {
         if (copyRestricted) return { error: copyRestrictedMessage };
         if (request.action === 'start' || request.action === 'replay') speak();
-        if (request.action === 'pause') stop();
+        if (request.action === 'stop' || request.action === 'pause') stop();
         if (request.action === 'next') { current = nextIndex(current, sentences.length); speak(); }
         if (request.action === 'previous') { current = previousIndex(current, sentences.length); speak(); }
         if (request.action === 'slow') { rate = rate === .8 ? 1 : .8; speak(); }
         if (typeof request.index === 'number') { current = clampIndex(request.index, sentences.length); mark(); }
         sendState();
+        return state();
       }
-      if (request.type === 'listen-back-get-state') return copyRestricted ? { count: 0, current: 0, text: '', rate, error: copyRestrictedMessage } : { count: sentences.length, current, text: sentences[current]?.text || '', rate };
+      if (request.type === 'listen-back-get-state') return copyRestricted ? { ...state(), count: 0, text: '', error: copyRestrictedMessage } : state();
     });
 
     document.addEventListener('keydown', (event) => {

@@ -74,6 +74,16 @@ describe('static deployment response policy', () => {
     execFileSync('node', ['scripts/verify-extension.mjs', '--claim', 'source-marker'], { stdio: 'pipe' });
   }, 30_000);
 
+  it('@claim:stop-reading cancels current speech in the packaged extension', () => {
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe', env: productionEnvironment });
+    execFileSync('node', ['scripts/verify-extension.mjs', '--claim', 'stop-reading'], { stdio: 'pipe' });
+  }, 30_000);
+
+  it('@claim:offline-controls keeps packaged extension controls working after an article loads offline', () => {
+    execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe', env: productionEnvironment });
+    execFileSync('node', ['scripts/verify-extension.mjs', '--claim', 'offline-controls'], { stdio: 'pipe' });
+  }, 30_000);
+
   it('@claim:active-page-only packages explicit active-tab injection with no standing site access', async () => {
     execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe', env: productionEnvironment });
     const manifest = JSON.parse(readFileSync('.output/chrome-mv3/manifest.json', 'utf8'));

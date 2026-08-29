@@ -54,7 +54,6 @@ try {
     headless: true,
     args: [`--disable-extensions-except=${automationExtensionPath}`, `--load-extension=${automationExtensionPath}`],
   });
-
   let worker = context.serviceWorkers()[0];
   if (!worker) worker = await context.waitForEvent('serviceworker');
   const activate = async (page) => {
@@ -96,8 +95,56 @@ try {
     const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
   });
   await activate(normal);
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find fixture tab ${url}`);
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: 'ISOLATED',
+      func: () => {
+        class TestUtterance {
+          constructor(text) { this.text = text; }
+          rate = 1;
+          onend = null;
+          onerror = null;
+        }
+        globalThis.__listenBackCancelCount = 0;
+        Object.defineProperty(globalThis, 'SpeechSynthesisUtterance', { configurable: true, value: TestUtterance });
+        Object.defineProperty(globalThis, 'speechSynthesis', {
+          configurable: true,
+          value: {
+            cancel: () => { globalThis.__listenBackCancelCount += 1; },
+            speak: () => undefined,
+          },
+        });
+      },
+    });
+  }, normal.url());
   await normal.keyboard.press('Alt+R');
   await normal.locator('#listen-back-marker').waitFor();
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find fixture tab ${url}`);
+    await chrome.tabs.sendMessage(tab.id, { type: 'listen-back-control', action: 'start' });
+  }, normal.url());
+  await normal.locator('#listen-back-marker[data-listen-back-speaking="true"]').waitFor();
+  const cancelCountBeforeStop = await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => globalThis.__listenBackCancelCount });
+    return result.result;
+  }, normal.url());
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find fixture tab ${url}`);
+    await chrome.tabs.sendMessage(tab.id, { type: 'listen-back-control', action: 'stop' });
+  }, normal.url());
+  await normal.locator('#listen-back-marker[data-listen-back-speaking="false"]').waitFor();
+  const cancelCountAfterStop = await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => globalThis.__listenBackCancelCount });
+    return result.result;
+  }, normal.url());
+  if (cancelCountAfterStop !== cancelCountBeforeStop + 1) throw new Error('Stop reading did not call speechSynthesis.cancel in the packaged extension.');
   const markerSnapshot = async () => {
     await normal.waitForTimeout(220);
     return normal.locator('#listen-back-marker').evaluate((marker) => {
@@ -168,11 +215,53 @@ try {
   if (await popup.locator('main').count() !== 1 || await popup.locator('h1').count() !== 1 || await popup.locator('h1').innerText() !== 'Read one sentence') {
     throw new Error('The popup is missing its semantic Read one sentence heading.');
   }
+  const popupEntry = productionManifest.action?.default_popup;
+  const popupHtml = popupEntry ? readFileSync(join(extensionPath, popupEntry), 'utf8') : '';
+  const popupScript = popupHtml.match(/src="([^"]+\.js)"/)?.[1];
+  const popupBundle = popupScript ? readFileSync(join(extensionPath, popupScript.replace(/^\//, '')), 'utf8') : '';
+  if (!popupBundle.includes('Stop reading')) throw new Error('The packaged popup does not expose Stop reading while speech is active.');
   const undersized = await popup.locator('button').evaluateAll((buttons) => buttons
     .map((button) => ({ label: button.getAttribute('aria-label') || button.textContent?.trim(), height: button.getBoundingClientRect().height }))
     .filter(({ height }) => height < 44));
   if (undersized.length) throw new Error(`Popup touch targets below 44px: ${JSON.stringify(undersized)}`);
   await popup.close();
+
+  const offline = await context.newPage();
+  const offlineRequests = [];
+  offline.on('request', (request) => offlineRequests.push(request.url()));
+  await offline.goto(`${origin}/offline`);
+  await offline.evaluate(() => {
+    const text = document.querySelector('p')?.firstChild;
+    if (!text) throw new Error('The offline fixture lacks source text.');
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 'First sentence is brief.'.length);
+    const selection = getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await activate(offline);
+  await offline.keyboard.press('Alt+R');
+  await offline.locator('#listen-back-marker').waitFor();
+  const beforeOffline = await offline.locator('#listen-back-marker').getAttribute('aria-label');
+  offlineRequests.length = 0;
+  await context.setOffline(true);
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find offline fixture tab ${url}`);
+    await chrome.tabs.sendMessage(tab.id, { type: 'listen-back-control', action: 'next' });
+  }, offline.url());
+  await offline.waitForFunction((previous) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== previous, beforeOffline);
+  const afterOffline = await offline.locator('#listen-back-marker').getAttribute('aria-label');
+  await worker.evaluate(async (url) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+    if (!tab?.id) throw new Error(`Could not find offline fixture tab ${url}`);
+    await chrome.tabs.sendMessage(tab.id, { type: 'listen-back-control', action: 'previous' });
+  }, offline.url());
+  await offline.waitForFunction((previous) => document.querySelector('#listen-back-marker')?.getAttribute('aria-label') !== previous, afterOffline);
+  if (offlineRequests.length) throw new Error(`Extension controls requested the network while offline: ${offlineRequests.join(', ')}`);
+  await context.setOffline(false);
+  await offline.close();
   await normal.close();
 
   const midway = await context.newPage();
@@ -220,7 +309,7 @@ try {
 
   await verifyBlocked('/noarchive');
   await verifyBlocked('/no-copy');
-  console.log('Verified the production extension in Chromium: the marker follows exact wrapped sentence ranges forward and back, pages remain untouched until invocation, dense punctuation stays source-faithful, protected pages stay unread, and popup controls are at least 44px.');
+  console.log('Verified the production extension in Chromium: source markers, explicit invocation, punctuation, protected pages, Stop reading, and popup accessibility pass.');
 } finally {
   await context?.close();
   await new Promise((resolveClosed) => server.close(resolveClosed));

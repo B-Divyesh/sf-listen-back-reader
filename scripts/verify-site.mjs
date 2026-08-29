@@ -51,16 +51,43 @@ async function verifyViewport(width, height) {
   await page.getByRole('link', { name: 'Privacy' }).first().click();
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
   await page.goBack();
-  await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
+  await page.waitForFunction(() => document.activeElement?.id === 'nav-privacy');
   await page.goForward();
   await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
   await page.goBack();
-  await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
+  await page.waitForFunction(() => document.activeElement?.id === 'nav-privacy');
   for (const from of ['/demo?demo=1', '/privacy', '/terms']) {
     await page.goto(`${baseUrl}${from}`);
     await page.getByRole('link', { name: 'How it works' }).click();
     if (new URL(page.url()).pathname !== '/') throw new Error(`How it works did not return home from ${from}.`);
     await page.waitForFunction(() => document.activeElement?.id === 'how-heading');
+  }
+  await page.goto(`${baseUrl}/`);
+  await page.locator('#nav-how').focus();
+  await page.locator('#nav-how').click();
+  await page.waitForFunction(() => document.activeElement?.id === 'how-heading');
+  await page.goBack();
+  await page.waitForFunction(() => document.activeElement?.id === 'nav-how');
+  await page.goForward();
+  await page.waitForFunction(() => document.activeElement?.id === 'how-heading');
+
+  await page.goto(`${baseUrl}/`);
+  await page.locator('#footer-privacy').scrollIntoViewIfNeeded();
+  await page.locator('#footer-privacy').focus();
+  const footerScroll = await page.evaluate(() => scrollY);
+  await page.locator('#footer-privacy').click();
+  await page.waitForFunction(() => document.activeElement?.id === 'privacy-heading');
+  await page.goBack();
+  await page.waitForFunction(() => document.activeElement?.id === 'footer-privacy');
+  const restoredScroll = await page.evaluate(() => scrollY);
+  if (Math.abs(restoredScroll - footerScroll) > 2) throw new Error(`Back restored scroll ${restoredScroll}, expected ${footerScroll}.`);
+
+  await page.goto(`${baseUrl}/`);
+  const compatibility = page.getByText('Extension requires desktop Chrome or Chromium; the demo works on mobile.');
+  if (!await compatibility.isVisible()) throw new Error('The first screen does not disclose desktop-only extension support.');
+  if (width <= 390) {
+    const box = await compatibility.boundingBox();
+    if (!box || box.y + box.height > height) throw new Error('The desktop-only disclosure is below the first mobile viewport.');
   }
   const smallTargets = await page.locator('a:visible, button:visible').evaluateAll((elements) => elements
     .map((element) => ({ label: element.getAttribute('aria-label') || element.textContent?.trim(), width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }))
@@ -69,7 +96,7 @@ async function verifyViewport(width, height) {
 
   await context.setOffline(true);
   await page.getByRole('link', { name: 'Privacy' }).first().click();
-  await page.getByRole('heading', { level: 1, name: 'Privacy is local by default.' }).waitFor();
+  await page.getByRole('heading', { level: 1, name: 'How Listen Back handles article text.' }).waitFor();
   const motion = await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior);
   if (motion !== 'auto') throw new Error(`Reduced-motion scroll behavior is ${motion}, not auto.`);
 

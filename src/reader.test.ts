@@ -90,6 +90,41 @@ describe('protected page policy', () => {
 });
 
 describe('content-script protected-page keyboard regression', () => {
+  it('cancels active speech when Stop reading is used', async () => {
+    document.documentElement.removeAttribute('data-listen-back');
+    document.head.innerHTML = '';
+    document.body.innerHTML = '<main><p>One sentence to stop.</p></main>';
+
+    let main: (() => void) | undefined;
+    let receive: ((message: unknown) => unknown) | undefined;
+    const cancel = vi.fn();
+    vi.stubGlobal('speechSynthesis', { cancel, speak: vi.fn() });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { rate = 1; onend?: () => void; onerror?: () => void; constructor(public text: string) {} });
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal('browser', {
+      runtime: {
+        onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
+        sendMessage: vi.fn(() => Promise.resolve()),
+      },
+    });
+    vi.stubGlobal('defineContentScript', (definition: { main: () => void }) => {
+      main = definition.main;
+      return definition;
+    });
+
+    vi.resetModules();
+    await import('../entrypoints/content');
+    main?.();
+    const started = receive?.({ type: 'listen-back-control', action: 'start' }) as { speaking: boolean };
+    cancel.mockClear();
+    const stopped = receive?.({ type: 'listen-back-control', action: 'stop' }) as { speaking: boolean };
+
+    expect(started.speaking).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stopped.speaking).toBe(false);
+  });
+
   it('@claim:sentence-loop supplies every normalized source character to speech across dense punctuation', async () => {
     document.documentElement.removeAttribute('data-listen-back');
     document.head.innerHTML = '';

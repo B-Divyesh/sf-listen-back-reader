@@ -32,6 +32,7 @@ async function openDemo(): Promise<DemoPage> {
       text: string;
       rate = 1;
       onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
       constructor(text: string) { this.text = text; }
     }
     Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: DemoUtterance });
@@ -54,7 +55,8 @@ describe('browser demo sandbox', () => {
       expect(await page.getByText('Demo — sample data, nothing is saved.').isVisible()).toBe(true);
       const control = page.getByRole('button', { name: 'Read highlighted sentence' });
       expect(await control.isVisible()).toBe(true);
-      expect((await control.boundingBox())?.y).toBeLessThan(844);
+      const controlBox = await control.boundingBox();
+      expect((controlBox?.y ?? 844) + (controlBox?.height ?? 0)).toBeLessThan(844);
     } finally { await context.close(); }
   });
 
@@ -86,13 +88,25 @@ describe('browser demo sandbox', () => {
     } finally { await context.close(); }
   });
 
-  it('@claim:local-text keeps demo reading and network requests on this origin', async () => {
+  it('@claim:local-text sends no article text to a Listen Back server', async () => {
     const { context, page, requests } = await openDemo();
     try {
+      await page.waitForLoadState('networkidle');
+      requests.length = 0;
       await page.getByRole('button', { name: 'Read highlighted sentence' }).click();
       await page.getByRole('button', { name: 'Next sentence' }).click();
-      expect(requests.length).toBeGreaterThan(0);
-      expect(requests.every((url) => new URL(url).origin === new URL(baseUrl).origin)).toBe(true);
+      expect(requests).toEqual([]);
+    } finally { await context.close(); }
+  });
+
+  it('keeps the demo controls working after the site goes offline', async () => {
+    const { context, page } = await openDemo();
+    try {
+      await context.setOffline(true);
+      await page.getByRole('button', { name: 'Next sentence' }).click();
+      expect(await page.getByText('Sentence 4 / 5').isVisible()).toBe(true);
+      await page.getByRole('button', { name: 'Previous sentence' }).click();
+      expect(await page.getByText('Sentence 3 / 5').isVisible()).toBe(true);
     } finally { await context.close(); }
   });
 
@@ -112,7 +126,7 @@ describe('browser demo sandbox', () => {
   it('@claim:demo-not-saved keeps sample controls out of browser storage', async () => {
     const { context, page, requests } = await openDemo();
     try {
-      await page.getByRole('button', { name: 'Slow' }).click();
+      await page.getByRole('button', { name: 'Use 0.8× speed' }).click();
       await page.getByRole('button', { name: 'Reset demo' }).click();
       await page.reload();
       const storage = await page.evaluate(async () => ({
@@ -131,6 +145,52 @@ describe('browser demo sandbox', () => {
       await page.getByRole('link', { name: 'Privacy' }).first().click();
       expect(page.url()).toBe(`${baseUrl}/privacy`);
       expect(await page.locator('h1').evaluate((heading) => document.activeElement === heading)).toBe(true);
+    } finally { await context.close(); }
+  });
+
+  it('reports unavailable speech and an utterance error without leaving a false reading state', async () => {
+    const unavailableContext = await browser.newContext();
+    const unavailable = await unavailableContext.newPage();
+    await unavailable.addInitScript(() => {
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: undefined });
+    });
+    try {
+      await unavailable.goto(`${baseUrl}/?demo=1`);
+      await unavailable.getByRole('button', { name: 'Read highlighted sentence' }).click();
+      await expect(unavailable.getByText('Speech is unavailable. Enable a browser voice, then try again.').isVisible()).resolves.toBe(true);
+      await expect(unavailable.getByRole('button', { name: 'Read highlighted sentence' }).isVisible()).resolves.toBe(true);
+    } finally { await unavailableContext.close(); }
+
+    const errorContext = await browser.newContext();
+    const errorPage = await errorContext.newPage();
+    await errorPage.addInitScript(() => {
+      class ErrorUtterance {
+        rate = 1;
+        onend: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(public text: string) {}
+      }
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: ErrorUtterance });
+      Object.defineProperty(window, 'speechSynthesis', {
+        configurable: true,
+        value: { cancel: () => undefined, speak: (utterance: ErrorUtterance) => utterance.onerror?.() },
+      });
+    });
+    try {
+      await errorPage.goto(`${baseUrl}/?demo=1`);
+      await errorPage.getByRole('button', { name: 'Read highlighted sentence' }).click();
+      await expect(errorPage.getByText('The browser voice could not read this sentence. Enable a browser voice, then try again.').isVisible()).resolves.toBe(true);
+      await expect(errorPage.getByRole('button', { name: 'Read highlighted sentence' }).isVisible()).resolves.toBe(true);
+    } finally { await errorContext.close(); }
+  });
+
+  it('stops demo speech and restores the read action', async () => {
+    const { context, page } = await openDemo();
+    try {
+      await page.getByRole('button', { name: 'Read highlighted sentence' }).click();
+      await page.getByRole('button', { name: 'Stop reading' }).click();
+      await expect(page.getByText('Reading stopped.').isVisible()).resolves.toBe(true);
+      await expect(page.getByRole('button', { name: 'Read highlighted sentence' }).isVisible()).resolves.toBe(true);
     } finally { await context.close(); }
   });
 });

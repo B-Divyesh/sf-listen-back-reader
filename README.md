@@ -4,18 +4,21 @@ Replay one web sentence at a time without losing your place.
 
 Listen Back Reader is a free browser extension for dyslexic readers and anyone
 who gets tired while reading dense web text. It uses voices already available
-in your browser. Page text does not leave your device.
+in your browser. Listen Back does not send article text to a Listen Back server.
 
 ## What it does
 
 - Finds readable article text on the current page.
-- Reads one sentence at a time with replay, slower speed, back, and next.
+- Reads one sentence at a time with replay, stop, slower speed, previous, and next.
 - Marks the source sentence while it reads.
 - Supports Alt + R, Alt + Left, and Alt + Right.
 
 The extension reads the active page only after you open its toolbar popup or
 press Alt + R. It does not request access to every site in advance. It does not
 rewrite text, make a diagnosis, create a voice, or store an account.
+
+Extension controls work offline after an article loads. Speech depends on the
+voice selected by your browser or operating system.
 
 ## Try the sample
 
@@ -53,7 +56,7 @@ npm run test:site
 `npm run build:site` writes the static site to `dist/site`. The extension ZIP
 is at `dist/site/downloads/listen-back-reader.zip`.
 
-Deploy with the configured work order:
+Deploy the site with the repository's deploy script:
 
 ```sh
 npm run deploy:site
@@ -61,9 +64,9 @@ npm run deploy:site
 
 ## Privacy
 
-The speech engine is your browser and operating system speech service. Listen
-Back Reader has no server, tracking, accounts, analytics, or cloud text upload.
-Read the included [privacy page](https://listen-back-reader.sociobot.in/privacy)
+Your browser or operating system provides speech. Some voices may need a network
+connection. The extension has no Listen Back server, tracking, accounts, or
+analytics. Read the included [privacy page](https://listen-back-reader.sociobot.in/privacy)
 and [terms page](https://listen-back-reader.sociobot.in/terms).
 
 ## License
