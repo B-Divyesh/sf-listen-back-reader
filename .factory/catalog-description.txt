@@ -1,1 +1,1 @@
-Replay web sentences one at a time and keep your place.
+Replay web sentences one at a time to keep your place.

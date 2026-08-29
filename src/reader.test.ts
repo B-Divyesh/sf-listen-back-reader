@@ -177,6 +177,55 @@ describe('content-script protected-page keyboard regression', () => {
     ]);
   });
 
+  it('@claim:does-not-rewrite preserves a realistic article DOM while the reader runs', async () => {
+    document.documentElement.removeAttribute('data-listen-back');
+    document.head.innerHTML = '';
+    document.body.innerHTML = `<main><article id="article-source"><h1>East Ward library update.</h1><p>On 14 March 2026, <a href="/mira-patel">Dr. Mira Patel</a> presented the late-hours plan.</p><p>The $2.4 million pilot keeps the study floor open until 9 p.m.</p><p>The U.S. Census Bureau will publish a follow-up report.</p></article></main>`;
+    const article = document.querySelector<HTMLElement>('#article-source');
+    if (!article) throw new Error('The article fixture is missing.');
+    const sourceText = article.textContent;
+    const sourceMarkup = article.innerHTML;
+
+    let main: (() => void) | undefined;
+    let receive: ((message: unknown) => unknown) | undefined;
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    vi.stubGlobal('speechSynthesis', { cancel, speak });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { rate = 1; onend?: () => void; onerror?: () => void; constructor(public text: string) {} });
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value() {
+        return [{ left: 20, top: 40, width: 300, height: 24, right: 320, bottom: 64 }];
+      },
+    });
+    vi.stubGlobal('browser', {
+      runtime: {
+        onMessage: { addListener: vi.fn((listener) => { receive = listener; }) },
+        sendMessage: vi.fn(() => Promise.resolve()),
+      },
+    });
+    vi.stubGlobal('defineContentScript', (definition: { main: () => void }) => {
+      main = definition.main;
+      return definition;
+    });
+
+    vi.resetModules();
+    await import('../entrypoints/content');
+    main?.();
+    receive?.({ type: 'listen-back-control', action: 'start' });
+    receive?.({ type: 'listen-back-control', action: 'next' });
+    receive?.({ type: 'listen-back-control', action: 'stop' });
+
+    expect(speak).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalled();
+    expect(article.textContent).toBe(sourceText);
+    expect(article.innerHTML).toBe(sourceMarkup);
+    expect(article.querySelector('#listen-back-marker')).toBeNull();
+    expect(document.querySelector('#listen-back-marker')?.parentElement).toBe(document.body);
+  });
+
   it('does not mark or speak a noarchive page after Alt+R', async () => {
     document.documentElement.removeAttribute('data-listen-back');
     document.head.innerHTML = '<meta name="robots" content="noarchive">';
